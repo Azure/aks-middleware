@@ -4,7 +4,7 @@ generate:
 	cd test/proto; npx buf mod update; cd ..; npx buf generate; cd ..
 
 init:
-	go mod init go.goms.io/aks/rp/aks-middleware
+	go mod init github.com/Azure/aks-middleware
 
 tidy:
 	go mod tidy

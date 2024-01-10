@@ -2,7 +2,7 @@ version: v1
 managed:
   enabled: true
   go_package_prefix:
-    default: "go.goms.io/aks/rp/aks-middleware/test"
+    default: "github.com/Azure/aks-middleware/test"
     except:
     - buf.build/bufbuild/protovalidate
     - buf.build/service-hub/loggable

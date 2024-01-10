@@ -1,10 +1,10 @@
 package interceptor
 
 import (
-	"go.goms.io/aks/rp/aks-middleware/autologger"
-	"go.goms.io/aks/rp/aks-middleware/ctxlogger"
-	"go.goms.io/aks/rp/aks-middleware/mdforward"
-	"go.goms.io/aks/rp/aks-middleware/requestid"
+	"github.com/Azure/aks-middleware/autologger"
+	"github.com/Azure/aks-middleware/ctxlogger"
+	"github.com/Azure/aks-middleware/mdforward"
+	"github.com/Azure/aks-middleware/requestid"
 
 	"github.com/bufbuild/protovalidate-go"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"

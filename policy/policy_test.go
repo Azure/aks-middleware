@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"net/http"
 
+	serviceHubPolicy "github.com/Azure/aks-middleware/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/ghttp"
 	"github.com/sirupsen/logrus"
-	serviceHubPolicy "go.goms.io/aks/rp/aks-middleware/policy"
 )
 
 var _ = Describe("LoggingPolicy", func() {

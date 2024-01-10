@@ -1,4 +1,4 @@
-module go.goms.io/aks/rp/aks-middleware
+module github.com/Azure/aks-middleware
 
 go 1.21.3
 

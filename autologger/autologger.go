@@ -4,9 +4,10 @@ package autologger
 // It provides customization function to go-grpc-middleware logging interceptor.
 
 import (
-	"go.goms.io/aks/rp/aks-middleware/requestid"
 	"context"
 	"fmt"
+
+	"github.com/Azure/aks-middleware/requestid"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	"github.com/sirupsen/logrus"

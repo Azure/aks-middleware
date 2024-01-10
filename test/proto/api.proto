@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 // https://protobuf.dev/reference/go/go-generated/#package
-option go_package = "go.goms.io/aks/rp/aks-middleware/testing";
+option go_package = "github.com/Azure/aks-middleware/testing";
 
 import "buf/validate/validate.proto";
 import "proto/log.proto";

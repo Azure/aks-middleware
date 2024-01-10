@@ -1,8 +1,8 @@
 package ctxlogger_test
 
 import (
-	"go.goms.io/aks/rp/aks-middleware/ctxlogger"
-	pb "go.goms.io/aks/rp/aks-middleware/test"
+	"github.com/Azure/aks-middleware/ctxlogger"
+	pb "github.com/Azure/aks-middleware/test"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

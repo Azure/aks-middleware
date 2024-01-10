@@ -3,8 +3,9 @@ package ctxlogger
 import (
 	"context"
 
-	"go.goms.io/aks/rp/aks-middleware/requestid"
 	"encoding/json"
+
+	"github.com/Azure/aks-middleware/requestid"
 
 	loggable "buf.build/gen/go/service-hub/loggable/protocolbuffers/go/proto"
 	log "github.com/sirupsen/logrus"

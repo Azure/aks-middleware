@@ -1,7 +1,7 @@
 package interceptor_test
 
 import (
-	"go.goms.io/aks/rp/aks-middleware/interceptor"
+	"github.com/Azure/aks-middleware/interceptor"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -13,8 +13,8 @@ var _ = Describe("Recovery test", func() {
 					/usr/local/go1.19/src/runtime/debug/stack.go:24 +0x65
 				runtime/debug.PrintStack()
 					/usr/local/go1.19/src/runtime/debug/stack.go:16 +0x19
-				go.goms.io/aks/rp/aks-middleware/interceptor.GetRecoveryOpts.func1({0xac4000, 0xd00610})
-					/root/go/pkg/mod/go.goms.io/aks/rp/aks-middleware@v0.1.16/interceptor/recoveryOpts.go:38 +0x3e
+				github.com/Azure/aks-middleware/interceptor.GetRecoveryOpts.func1({0xac4000, 0xd00610})
+					/root/go/pkg/mod/github.com/Azure/aks-middleware@v0.1.16/interceptor/recoveryOpts.go:38 +0x3e
 				github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery.WithRecoveryHandler.func1.1({0x40f45f?, 0xc0007fa270?}, {0xac4000?, 0xd00610?})
 					/root/go/pkg/mod/github.com/grpc-ecosystem/go-grpc-middleware/v2@v2.0.0/interceptors/recovery/options.go:36 +0x2d
 				github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery.recoverFrom({0xd0a960?, 0xc0007fa270?}, {0xac4000?, 0xd00610?}, 0xc00071b250?)
@@ -35,12 +35,12 @@ var _ = Describe("Recovery test", func() {
 					/root/go/pkg/mod/github.com/grpc-ecosystem/go-grpc-middleware/v2@v2.0.0/interceptors/server.go:22 +0x2e3
 				google.golang.org/grpc.getChainUnaryHandler.func1({0xd0a960, 0xc0007fa210}, {0xb7b9c0, 0xc00073d1d0})
 					/root/go/pkg/mod/google.golang.org/grpc@v1.58.1/server.go:1195 +0xb9
-				go.goms.io/aks/rp/aks-middleware/ctxlogger.UnaryServerInterceptor.func1({0xd0a960, 0xc0007fa150}, {0xb7b9c0, 0xc00073d1d0}, 0xc00070e020?, 0xc0007ee900)
-					/root/go/pkg/mod/go.goms.io/aks/rp/aks-middleware@v0.1.16/ctxlogger/ctxlogger.go:57 +0xfe
+				github.com/Azure/aks-middleware/ctxlogger.UnaryServerInterceptor.func1({0xd0a960, 0xc0007fa150}, {0xb7b9c0, 0xc00073d1d0}, 0xc00070e020?, 0xc0007ee900)
+					/root/go/pkg/mod/github.com/Azure/aks-middleware@v0.1.16/ctxlogger/ctxlogger.go:57 +0xfe
 				google.golang.org/grpc.getChainUnaryHandler.func1({0xd0a960, 0xc0007fa150}, {0xb7b9c0, 0xc00073d1d0})
 					/root/go/pkg/mod/google.golang.org/grpc@v1.58.1/server.go:1195 +0xb9
-				go.goms.io/aks/rp/aks-middleware/requestid.UnaryServerInterceptor.func1({0xd0a960?, 0xc00069c330?}, {0xb7b9c0, 0xc00073d1d0}, 0xc00070e020?, 0xc0007ee8c0)
-					/root/go/pkg/mod/go.goms.io/aks/rp/aks-middleware@v0.1.16/requestid/requestid.go:30 +0x49
+				github.com/Azure/aks-middleware/requestid.UnaryServerInterceptor.func1({0xd0a960?, 0xc00069c330?}, {0xb7b9c0, 0xc00073d1d0}, 0xc00070e020?, 0xc0007ee8c0)
+					/root/go/pkg/mod/github.com/Azure/aks-middleware@v0.1.16/requestid/requestid.go:30 +0x49
 				google.golang.org/grpc.getChainUnaryHandler.func1({0xd0a960, 0xc00069c330}, {0xb7b9c0, 0xc00073d1d0})
 					/root/go/pkg/mod/google.golang.org/grpc@v1.58.1/server.go:1195 +0xb9
 				github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/protovalidate.UnaryServerInterceptor.func1({0xd0a960, 0xc00069c330}, {0xb7b9c0?, 0xc00073d1d0}, 0xc00070e020?, 0xc000696100)
