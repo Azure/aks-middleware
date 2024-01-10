@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+// https://protobuf.dev/reference/go/go-generated/#package
+option go_package = "go.goms.io/aks/rp/aks-middleware/testing";
+
+import "buf/validate/validate.proto";
+import "proto/log.proto";
+
+// package helloworld;
+
+service MyGreeter {
+  // Sends a greeting
+  rpc SayHello (HelloRequest) returns (HelloReply) {}
+}
+
+message HelloRequest {
+  string name = 1 [(buf.validate.field).string.min_len = 2]; 
+  int32 age = 2 [(buf.validate.field).int32 = {
+    gte: 1,
+    lt: 150
+  }, (servicehub.fieldoptions.loggable) = false]; 
+  string email = 3 [(buf.validate.field).string = {
+    min_len: 1,
+    pattern: "^[\\w.-]+@[\\w.-]+\\.[\\w]{2,}$"
+  }, (servicehub.fieldoptions.loggable) = false]; 
+  optional Address address = 4;
+}
+
+message HelloReply {
+  string message = 1; 
+}
+
+message Address {
+  string city = 1 [(buf.validate.field).string.min_len = 1]; // The city name
+  string state = 2 [(buf.validate.field).string.min_len = 1, (servicehub.fieldoptions.loggable) = false]; // The state name
+  int32 zipcode = 3 [(buf.validate.field).int32 = {
+    gte: 10000,
+    lt: 99999
+  }]; // The zip code
+  string street = 4 [(buf.validate.field).string.min_len = 1, (servicehub.fieldoptions.loggable) = false]; // The street name
+  
+}
