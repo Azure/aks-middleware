@@ -1,3 +1,65 @@
+<!-- markdownlint-disable MD004 -->
+# Overview
+
+This directory is the root of the aks-middleware module. It implements interceptors to aid common service tasks. See the list below for details.
+
+# Usage
+
+After the code is generated, run the following command in the root directory of this module.
+
+```bash
+make
+```
+
+# requestid
+
+ServerInterceptor. It adds x-request-id to MD if there is no such entry. This interceptor needs to be registered first so that its request-id can be used by autologger and applogger.
+
+# mdforward
+
+ClientInterceptor. It propagates MD from incoming to outgoing. Only need to be used in servers. No need to be used in a pure client app.
+
+# autologger
+
+This package only provides the default logger implementation to log request result and latency. We use go-grpc-middleware's logging.UnaryServerIncerceptor() and logging.UnaryClientInterceptor() to achieve this. This package is not an interceptor.
+
+# ctxlogger (applogger)
+
+ServerInterceptor. It adds a logger to ctx with important information (e.g., request-id, method-name) already poplulated. App's handler code can get the logger and output additional information. Needs to be registered after the requestid interceptor.
+
+Only information in MD could be propagated to dependencies. The logger added via ctx.WithValue() is local to the ctx and won't be propagated to dependencies.
+
+# retry
+
+This is a client interceptor that resends a request based on the gRPC code that is returned from the server
+
+All options for the interceptor (i.e. max retries, codes to retry on, type of backoff) are defined in the retryOpts.go file 
+
+# protovalidate
+
+This is a server side interceptor that we use to validate the requests that are coming in from the client
+
+The validation rules are generated and executed by the protovalidate-go library, and the rules are applied to the variables in the api.proto file
+
+# recovery
+
+This is a server side interceptor that is implemented to handle panics in the code
+
+Once a panic is detected, it is handled by a custom recovery function defined in recoveryOpts.go which logs gRPC code "unknown" along with the file name/line number of where the panic occurred and a link to the repo. The program continues and does not terminate.
+
+# log filtering
+
+This is a feature that allows the user to annotate within api.proto what request payload variables should be logged or not. Logic in the ctxlogger.go decides what to log based off the annoatation. The "loggable" annotation is true by default, so the user is only required to annotate the variables that should not be logged.
+
+Ancestors need to be loggable in order to examine the annotations on the leaf nodes. For example, if loggable value for "address" is false, it will not look for the loggable values of "city", "state", "zipcode", etc.
+
+The source code for the external loggable field option is located at https://github.com/toma3233/loggable. Whenever it is updated, it is pushed to the following Buf Schema Registry as a module: https://buf.build/service-hub/loggable. Command used to authenticate before pushing to the BSR is "buf registry login" which prompts for BSR username and BSR token. The .netrc file is updated with these credentials. 
+
+
+# aks-middleware
+
+
+
 # Project
 
 > This repo has been populated by an initial template to help get you started. Please
