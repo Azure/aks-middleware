@@ -2,6 +2,7 @@ package restlogger
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -23,11 +24,13 @@ func (lrt *LoggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, er
 
 	logger := logrus.New()
 	logger.Formatter = &logrus.JSONFormatter{}
+	parts := strings.Split(req.URL.Path, "/")
+	resource := parts[2]
 	logger.WithFields(logrus.Fields{
 		"grpc.code":        resp.StatusCode,
 		"grpc.component":   "client",
 		"grpc.time_ms":     latency,
-		"grpc.method":      req.Method + " " + req.URL.Path,
+		"grpc.method":      req.Method + " " + resource,
 		"grpc.service":     req.Host,
 		"source":           "ApiAutoLog",
 		"protocol":         "REST",
