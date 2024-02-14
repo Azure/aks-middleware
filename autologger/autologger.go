@@ -7,24 +7,27 @@ import (
 	"context"
 	"fmt"
 
+	log "log/slog"
+
 	"github.com/Azure/aks-middleware/requestid"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
-	"github.com/sirupsen/logrus"
 )
 
-func InterceptorLogger(logger logrus.FieldLogger) logging.Logger {
+func InterceptorLogger(logger *log.Logger) logging.Logger {
 	return logging.LoggerFunc(func(ctx context.Context, lvl logging.Level, msg string, fields ...any) {
 		// fmt.Println("ctx: ", ctx)
 		// fmt.Printf("fields: %v\n", fields)
 		f := make(map[string]any, len(fields)/2)
+		l := logger
 		i := logging.Fields(fields).Iterator()
 		for i.Next() {
 			k, v := i.At()
 			f[k] = v
+			logger.With(k, v)
 			// fmt.Printf("k %v, v %v\n", k, v)
 		}
-		l := logger.WithFields(f)
+
 		// fmt.Println(lvl, msg)
 		// l.Info("blah")
 

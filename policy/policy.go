@@ -1,8 +1,11 @@
 package policy
 
 import (
+	"log/slog"
+	log "log/slog"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
 	"strings"
 	"time"
@@ -10,14 +13,13 @@ import (
 	armPolicy "github.com/Azure/azure-sdk-for-go/sdk/azcore/arm/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	azcorePolicy "github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
-	"github.com/sirupsen/logrus"
 )
 
 type LoggingPolicy struct {
-	logger logrus.FieldLogger
+	logger log.Logger
 }
 
-func NewLoggingPolicy(logger logrus.FieldLogger) *LoggingPolicy {
+func NewLoggingPolicy(logger log.Logger) *LoggingPolicy {
 	return &LoggingPolicy{logger: logger}
 }
 
@@ -27,26 +29,26 @@ func (p *LoggingPolicy) Do(req *azcorePolicy.Request) (*http.Response, error) {
 	methodInfo := method + " " + base[0]
 	parsedURL, parseErr := url.Parse(req.Raw().URL.String())
 	if parseErr != nil {
-		p.logger.Println("Error parsing request URL: ", parseErr)
+		p.logger.Error("Error parsing request URL: ", parseErr)
 		return nil, parseErr
 	}
 	startTime := time.Now()
 	resp, err := req.Next()
 	if err != nil {
-		p.logger.Println("Error finishing request: ", err)
+		p.logger.Error("Error finishing request: ", err)
 		return nil, err
 	}
 
 	// Time is in ms
 	latency := time.Since(startTime).Milliseconds()
 
-	p.logger.WithFields(logrus.Fields{
-		"grpc.code":      resp.StatusCode,
-		"grpc.component": "client",
-		"grpc.time_ms":   latency,
-		"grpc.method":    methodInfo,
-		"grpc.service":   parsedURL.Host,
-	}).Info("finished call")
+	p.logger.With(
+		"grpc.code", resp.StatusCode,
+		"grpc.component", "client",
+		"grpc.time_ms", latency,
+		"grpc.method", methodInfo,
+		"grpc.service", parsedURL.Host,
+	).Info("finished call")
 
 	return resp, err
 }
@@ -68,14 +70,13 @@ func GetDefaultArmClientOptions() *armPolicy.ClientOptions {
 	armClientOptions := new(armPolicy.ClientOptions)
 	armClientOptions.ClientOptions = *clientOptions
 
-	logger := logrus.New()
-	logger.SetFormatter(&logrus.JSONFormatter{})
-	policyLogger := logger.WithFields(logrus.Fields{
-		"source":           "ApiAutoLog",
-		"grpc.method_type": "unary",
-		"protocol":         "REST",
-	})
-	loggingPolicy := NewLoggingPolicy(policyLogger)
+	logger := log.New(slog.NewJSONHandler(os.Stdout, nil))
+	policyLogger := logger.With(
+		"source", "ApiAutoLog",
+		"grpc.method_type", "unary",
+		"protocol", "REST",
+	)
+	loggingPolicy := NewLoggingPolicy(*policyLogger)
 
 	armClientOptions.PerCallPolicies = append(armClientOptions.PerCallPolicies, loggingPolicy)
 

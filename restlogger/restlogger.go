@@ -1,11 +1,11 @@
 package restlogger
 
 import (
+	log "log/slog"
 	"net/http"
+	"os"
 	"strings"
 	"time"
-
-	"github.com/sirupsen/logrus"
 )
 
 type LoggingRoundTripper struct {
@@ -22,20 +22,19 @@ func (lrt *LoggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, er
 
 	latency := time.Since(start).Milliseconds()
 
-	logger := logrus.New()
-	logger.Formatter = &logrus.JSONFormatter{}
+	logger := log.New(log.NewJSONHandler(os.Stdout, nil))
 	parts := strings.Split(req.URL.Path, "/")
 	resource := parts[2]
-	logger.WithFields(logrus.Fields{
-		"grpc.code":        resp.StatusCode,
-		"grpc.component":   "client",
-		"grpc.time_ms":     latency,
-		"grpc.method":      req.Method + " " + resource,
-		"grpc.service":     req.Host,
-		"source":           "ApiAutoLog",
-		"protocol":         "REST",
-		"grpc.method_type": "unary",
-	}).Info("finished call")
+	logger.With(
+		"grpc.code", resp.StatusCode,
+		"grpc.component", "client",
+		"grpc.time_ms", latency,
+		"grpc.method", req.Method+" "+resource,
+		"grpc.service", req.Host,
+		"source", "ApiAutoLog",
+		"protocol", "REST",
+		"grpc.method_type", "unary",
+	).Info("finished call")
 
 	return resp, err
 }

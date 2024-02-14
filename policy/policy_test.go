@@ -6,26 +6,26 @@ import (
 	"fmt"
 	"net/http"
 
+	log "log/slog"
+
 	serviceHubPolicy "github.com/Azure/aks-middleware/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/ghttp"
-	"github.com/sirupsen/logrus"
 )
 
 var _ = Describe("LoggingPolicy", func() {
 	var (
-		logger *logrus.Logger
+		logger *log.Logger
 		buf    bytes.Buffer
 		server *ghttp.Server
 	)
 
 	BeforeEach(func() {
-		logger = logrus.New()
+		logger = log.New(log.NewJSONHandler(&buf, nil))
 		buf = *new(bytes.Buffer)
-		logger.SetOutput(&buf)
 		server = ghttp.NewServer()
 	})
 
@@ -41,7 +41,7 @@ var _ = Describe("LoggingPolicy", func() {
 			))
 			clientOptions := new(policy.ClientOptions)
 			pipelineOptions := new(runtime.PipelineOptions)
-			clientOptions.PerCallPolicies = append(clientOptions.PerCallPolicies, serviceHubPolicy.NewLoggingPolicy(logger))
+			clientOptions.PerCallPolicies = append(clientOptions.PerCallPolicies, serviceHubPolicy.NewLoggingPolicy(*logger))
 			pipeline := runtime.NewPipeline("", "", *pipelineOptions, clientOptions)
 			req, err := runtime.NewRequest(context.Background(), http.MethodGet, server.URL())
 			Expect(err).NotTo(HaveOccurred())
@@ -51,9 +51,9 @@ var _ = Describe("LoggingPolicy", func() {
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 
 			Expect(buf.String()).To(ContainSubstring("finished call"))
-			Expect(buf.String()).To(ContainSubstring(fmt.Sprintf("grpc.code=%d", http.StatusOK)))
-			Expect(buf.String()).To(ContainSubstring(fmt.Sprintf("grpc.method=\"%s ", http.MethodGet)))
-			Expect(buf.String()).To(ContainSubstring("grpc.time_ms="))
+			Expect(buf.String()).To(ContainSubstring(fmt.Sprintf("\"grpc.code\":%d", http.StatusOK)))
+			Expect(buf.String()).To(ContainSubstring(fmt.Sprintf("\"grpc.method\":\"%s", http.MethodGet)))
+			Expect(buf.String()).To(ContainSubstring("\"grpc.time_ms\":"))
 		})
 	})
 })

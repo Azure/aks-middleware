@@ -6,17 +6,18 @@ import (
 	"github.com/Azure/aks-middleware/mdforward"
 	"github.com/Azure/aks-middleware/requestid"
 
+	log "log/slog"
+
 	"github.com/bufbuild/protovalidate-go"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	protovalidate_middleware "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/protovalidate"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/retry"
-	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
 
-func DefaultClientInterceptors(logger log.FieldLogger) []grpc.UnaryClientInterceptor {
-	apiAutologger := logger.WithField("source", "ApiAutoLog")
+func DefaultClientInterceptors(logger log.Logger) []grpc.UnaryClientInterceptor {
+	apiAutologger := logger.With("source", "ApiAutoLog")
 	return []grpc.UnaryClientInterceptor{
 		retry.UnaryClientInterceptor(GetRetryOptions()...),
 		mdforward.UnaryClientInterceptor(),
@@ -29,12 +30,12 @@ func DefaultClientInterceptors(logger log.FieldLogger) []grpc.UnaryClientInterce
 	}
 }
 
-func DefaultServerInterceptors(logger log.FieldLogger) []grpc.UnaryServerInterceptor {
+func DefaultServerInterceptors(logger log.Logger) []grpc.UnaryServerInterceptor {
 	// The first registerred interceptor will be called first.
 	// Need to register requestid first to add request-id.
 	// Then the logger can get the request-id.
-	apiAutologger := logger.WithField("source", "ApiAutoLog")
-	appCtxlogger := logger.WithField("source", "CtxLog")
+	apiAutologger := logger.With("source", "ApiAutoLog")
+	appCtxlogger := logger.With("source", "CtxLog")
 	validator, err := protovalidate.New()
 	if err != nil {
 		panic(err)
@@ -42,7 +43,7 @@ func DefaultServerInterceptors(logger log.FieldLogger) []grpc.UnaryServerInterce
 	return []grpc.UnaryServerInterceptor{
 		protovalidate_middleware.UnaryServerInterceptor(validator),
 		requestid.UnaryServerInterceptor(),
-		ctxlogger.UnaryServerInterceptor(appCtxlogger, nil),
+		ctxlogger.UnaryServerInterceptor(*appCtxlogger, nil),
 		logging.UnaryServerInterceptor(
 			autologger.InterceptorLogger(apiAutologger),
 			logging.WithLogOnEvents(logging.FinishCall),

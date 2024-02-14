@@ -7,8 +7,9 @@ import (
 
 	"github.com/Azure/aks-middleware/requestid"
 
+	log "log/slog"
+
 	loggable "buf.build/gen/go/service-hub/loggable/protocolbuffers/go/proto"
-	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -19,7 +20,7 @@ import (
 // ExtractFunction extracts information from the ctx and/or the request and put it in the logger.
 // This function is called before the application's handler is called so that it can add more context
 // to the logger.
-type ExtractFunction func(ctx context.Context, req any, info *grpc.UnaryServerInfo, logger log.FieldLogger) log.FieldLogger
+type ExtractFunction func(ctx context.Context, req any, info *grpc.UnaryServerInfo, logger *log.Logger) log.Logger
 
 type loggerKeyType int
 
@@ -27,16 +28,16 @@ const (
 	loggerKey loggerKeyType = iota
 )
 
-func WithLogger(ctx context.Context, logger log.FieldLogger) context.Context {
+func WithLogger(ctx context.Context, logger log.Logger) context.Context {
 	return context.WithValue(ctx, loggerKey, logger)
 }
 
-func GetLogger(ctx context.Context) log.FieldLogger {
-	logger := log.New().WithField("src", "self gen, not available in ctx")
+func GetLogger(ctx context.Context) *log.Logger {
+	logger := log.Default().With("src", "self gen, not available in ctx")
 	if ctx == nil {
 		return logger
 	}
-	if ctxlogger, ok := ctx.Value(loggerKey).(log.FieldLogger); ok {
+	if ctxlogger, ok := ctx.Value(loggerKey).(*log.Logger); ok {
 		return ctxlogger
 	}
 	return logger
@@ -50,15 +51,15 @@ func GetLogger(ctx context.Context) log.FieldLogger {
 // The first registerred interceptor will be called first.
 // Need to register requestid first to add request-id.
 // Then the logger can get the request-id.
-func UnaryServerInterceptor(logger log.FieldLogger, extractFunction ExtractFunction) grpc.UnaryServerInterceptor {
+func UnaryServerInterceptor(logger log.Logger, extractFunction ExtractFunction) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo,
 		handler grpc.UnaryHandler) (resp any, err error) {
 		if extractFunction != nil {
-			logger = extractFunction(ctx, req, info, logger)
+			logger = extractFunction(ctx, req, info, &logger)
 		} else {
 			logger = defaultExtractFunction(ctx, req, info, logger)
 		}
-		logger = logger.WithField(requestContentLogKey, FilterLogs(req))
+		logger = *logger.With(requestContentLogKey, FilterLogs(req))
 		ctx = WithLogger(ctx, logger)
 		// log.Print("logger ctx: ", ctx)
 		return handler(ctx, req)
@@ -70,15 +71,14 @@ const (
 	requestContentLogKey = "request"
 )
 
-func defaultExtractFunction(ctx context.Context, req any, info *grpc.UnaryServerInfo, logger log.FieldLogger) log.FieldLogger {
-	fields := log.Fields{}
-	fields[methodLogKey] = info.FullMethod
-	fields[requestid.RequestIDLogKey] = requestid.GetRequestID(ctx)
+func defaultExtractFunction(ctx context.Context, req any, info *grpc.UnaryServerInfo, logger log.Logger) log.Logger {
+	logger.With(methodLogKey, info.FullMethod)
+	logger.With(requestid.RequestIDLogKey, requestid.GetRequestID(ctx))
 	message, ok := req.(proto.Message)
 	if ok {
-		fields[requestContentLogKey] = message
+		logger.With(requestContentLogKey, message)
 	}
-	return logger.WithFields(fields)
+	return logger
 }
 
 func filterLoggableFields(currentMap map[string]interface{}, message protoreflect.Message) map[string]interface{} {
@@ -125,12 +125,12 @@ func FilterLogs(req any) map[string]interface{} {
 		// Marshal the message to JSON bytes
 		jsonBytes, err := protojson.Marshal(message.Interface().(protoreflect.ProtoMessage))
 		if err != nil {
-			log.Println(err)
+			log.Error(err.Error())
 		}
 		// Unmarshal the JSON bytes to a map[string]interface{}
 		err = json.Unmarshal(jsonBytes, &reqPayload)
 		if err != nil {
-			log.Println(err)
+			log.Error(err.Error())
 		}
 		// Filter out the fields that are not loggable using the helper function
 		reqPayload = filterLoggableFields(reqPayload, message)
