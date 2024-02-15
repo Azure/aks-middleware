@@ -60,7 +60,6 @@ func UnaryServerInterceptor(logger log.FieldLogger, extractFunction ExtractFunct
 		}
 		logger = logger.WithField(requestContentLogKey, FilterLogs(req))
 		ctx = WithLogger(ctx, logger)
-		// log.Print("logger ctx: ", ctx)
 		return handler(ctx, req)
 	}
 }
