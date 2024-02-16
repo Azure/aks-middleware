@@ -20,7 +20,7 @@ import (
 // ExtractFunction extracts information from the ctx and/or the request and put it in the logger.
 // This function is called before the application's handler is called so that it can add more context
 // to the logger.
-type ExtractFunction func(ctx context.Context, req any, info *grpc.UnaryServerInfo, logger *log.Logger) log.Logger
+type ExtractFunction func(ctx context.Context, req any, info *grpc.UnaryServerInfo, logger *log.Logger) *log.Logger
 
 type loggerKeyType int
 
@@ -28,7 +28,7 @@ const (
 	loggerKey loggerKeyType = iota
 )
 
-func WithLogger(ctx context.Context, logger log.Logger) context.Context {
+func WithLogger(ctx context.Context, logger *log.Logger) context.Context {
 	return context.WithValue(ctx, loggerKey, logger)
 }
 
@@ -51,16 +51,17 @@ func GetLogger(ctx context.Context) *log.Logger {
 // The first registerred interceptor will be called first.
 // Need to register requestid first to add request-id.
 // Then the logger can get the request-id.
-func UnaryServerInterceptor(logger log.Logger, extractFunction ExtractFunction) grpc.UnaryServerInterceptor {
+func UnaryServerInterceptor(logger *log.Logger, extractFunction ExtractFunction) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo,
 		handler grpc.UnaryHandler) (resp any, err error) {
+		l := logger
 		if extractFunction != nil {
-			logger = extractFunction(ctx, req, info, &logger)
+			l = extractFunction(ctx, req, info, l)
 		} else {
-			logger = defaultExtractFunction(ctx, req, info, logger)
+			l = defaultExtractFunction(ctx, req, info, l)
 		}
-		logger = *logger.With(requestContentLogKey, FilterLogs(req))
-		ctx = WithLogger(ctx, logger)
+		l = l.With(requestContentLogKey, FilterLogs(req))
+		ctx = WithLogger(ctx, l)
 		// log.Print("logger ctx: ", ctx)
 		return handler(ctx, req)
 	}
@@ -71,14 +72,11 @@ const (
 	requestContentLogKey = "request"
 )
 
-func defaultExtractFunction(ctx context.Context, req any, info *grpc.UnaryServerInfo, logger log.Logger) log.Logger {
-	logger.With(methodLogKey, info.FullMethod)
-	logger.With(requestid.RequestIDLogKey, requestid.GetRequestID(ctx))
-	message, ok := req.(proto.Message)
-	if ok {
-		logger.With(requestContentLogKey, message)
-	}
-	return logger
+func defaultExtractFunction(ctx context.Context, req any, info *grpc.UnaryServerInfo, logger *log.Logger) *log.Logger {
+	l := logger
+	l = l.With(methodLogKey, info.FullMethod)
+	l = l.With(requestid.RequestIDLogKey, requestid.GetRequestID(ctx))
+	return l
 }
 
 func filterLoggableFields(currentMap map[string]interface{}, message protoreflect.Message) map[string]interface{} {

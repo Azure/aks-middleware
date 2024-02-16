@@ -43,7 +43,7 @@ func DefaultServerInterceptors(logger log.Logger) []grpc.UnaryServerInterceptor 
 	return []grpc.UnaryServerInterceptor{
 		protovalidate_middleware.UnaryServerInterceptor(validator),
 		requestid.UnaryServerInterceptor(),
-		ctxlogger.UnaryServerInterceptor(*appCtxlogger, nil),
+		ctxlogger.UnaryServerInterceptor(appCtxlogger, nil),
 		logging.UnaryServerInterceptor(
 			autologger.InterceptorLogger(apiAutologger),
 			logging.WithLogOnEvents(logging.FinishCall),

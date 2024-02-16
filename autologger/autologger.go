@@ -24,7 +24,7 @@ func InterceptorLogger(logger *log.Logger) logging.Logger {
 		for i.Next() {
 			k, v := i.At()
 			f[k] = v
-			logger.With(k, v)
+			l = l.With(k, v)
 			// fmt.Printf("k %v, v %v\n", k, v)
 		}
 
