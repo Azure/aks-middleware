@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path"
 	"strings"
 	"time"
 
@@ -28,22 +27,29 @@ func (p *LoggingPolicy) Do(req *azcorePolicy.Request) (*http.Response, error) {
 	resp, err := req.Next()
 
 	method := req.Raw().Method
-	base := strings.Split(path.Base(req.Raw().URL.String()), "?")
-	methodInfo := method + " " + base[0]
 	parsedURL, parseErr := url.Parse(req.Raw().URL.String())
 	if parseErr != nil {
 		p.logger.With(
 			"grpc.component", "client",
-			"grpc.method", methodInfo,
-			"grpc.service", parsedURL.Host,
+			"grpc.method", "ERROR",
+			"grpc.service", "ERROR",
+			"url", req.Raw().URL.String(),
+			"error", parseErr.Error(),
 		).Error("Error parsing request URL: ", parseErr)
 		return nil, parseErr
 	}
+
+	trimmedURL := trimURL(*parsedURL)
+	splitPath := strings.Split(trimmedURL, "/")
+	methodInfo := method + " " + splitPath[3]
+	
 	if err != nil {
 		p.logger.With(
 			"grpc.component", "client",
 			"grpc.method", methodInfo,
 			"grpc.service", parsedURL.Host,
+			"url", trimmedURL,
+			"error", err.Error(),
 		).Error("Error finishing request: ", err)
 		return nil, err
 	}
@@ -57,6 +63,7 @@ func (p *LoggingPolicy) Do(req *azcorePolicy.Request) (*http.Response, error) {
 		"grpc.time_ms", latency,
 		"grpc.method", methodInfo,
 		"grpc.service", parsedURL.Host,
+		"url", trimmedURL,
 	).Info("finished call")
 
 	return resp, err
@@ -90,4 +97,25 @@ func GetDefaultArmClientOptions() *armPolicy.ClientOptions {
 	armClientOptions.PerCallPolicies = append(armClientOptions.PerCallPolicies, loggingPolicy)
 
 	return armClientOptions
+}
+
+func trimURL(parsedURL url.URL) string {
+
+    query := parsedURL.Query()
+    apiVersion := query.Get("api-version")
+
+    // Remove all other query parameters
+    for key := range query {
+        if key != "api-version" {
+            query.Del(key)
+        }
+    }
+
+    // Set the api-version query parameter
+    query.Set("api-version", apiVersion)
+
+    // Encode the query parameters and set them in the parsed URL
+    parsedURL.RawQuery = query.Encode()
+
+    return parsedURL.String()
 }
