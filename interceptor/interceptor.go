@@ -7,6 +7,8 @@ import (
 	"github.com/Azure/aks-middleware/requestid"
 
 	log "log/slog"
+	"os"
+	"strings"
 
 	"github.com/bufbuild/protovalidate-go"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
@@ -35,7 +37,31 @@ func DefaultServerInterceptors(logger log.Logger) []grpc.UnaryServerInterceptor 
 	// Need to register requestid first to add request-id.
 	// Then the logger can get the request-id.
 	apiAutologger := logger.With("source", "ApiAutoLog")
-	appCtxlogger := logger.With("source", "CtxLog")
+	var handler log.Handler
+
+	handlerOptions := &log.HandlerOptions{
+		AddSource: true,
+		ReplaceAttr: func(groups []string, a log.Attr) log.Attr {
+			if a.Key == log.SourceKey {
+				// Needed to add to prevent "CtxLog" key from being changed as well
+				switch value := a.Value.Any().(type) {
+				case *log.Source:
+					if strings.Contains(value.File, ".go") {
+						a.Key = "location"
+					}
+				}
+			}
+			return a
+		},
+	}
+
+	if _, ok := logger.Handler().(*log.JSONHandler); ok {
+		handler = log.NewJSONHandler(os.Stdout, handlerOptions)
+	} else {
+		handler = log.NewTextHandler(os.Stdout, handlerOptions)
+	}
+
+	appCtxlogger := log.New(handler).With("source", "CtxLog")
 	validator, err := protovalidate.New()
 	if err != nil {
 		panic(err)
