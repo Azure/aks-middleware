@@ -40,8 +40,16 @@ func (p *LoggingPolicy) Do(req *azcorePolicy.Request) (*http.Response, error) {
 	}
 
 	trimmedURL := trimURL(*parsedURL)
+	// ex url: "https://management.azure.com/subscriptions/{sub_id}/resourcegroups?api-version={version}"
 	splitPath := strings.Split(trimmedURL, "/")
-	methodInfo := method + " " + splitPath[3]
+	resourceType := splitPath[5]
+	if strings.ContainsAny(resourceType, "?/") {
+		index := strings.IndexAny(resourceType, "?/")
+		resourceType = resourceType[:index]
+	}
+
+	// REST VERB + Resource Type
+	methodInfo := method + " " + resourceType
 	
 	if err != nil {
 		p.logger.With(
@@ -57,14 +65,21 @@ func (p *LoggingPolicy) Do(req *azcorePolicy.Request) (*http.Response, error) {
 	// Time is in ms
 	latency := time.Since(startTime).Milliseconds()
 
-	p.logger.With(
+	logEntry := p.logger.With(
 		"grpc.code", resp.StatusCode,
 		"grpc.component", "client",
 		"grpc.time_ms", latency,
 		"grpc.method", methodInfo,
 		"grpc.service", parsedURL.Host,
 		"url", trimmedURL,
-	).Info("finished call")
+	)
+	
+	// separate check here b/c previous error check only checks if there was an error in the req
+	if 200 <= resp.StatusCode && resp.StatusCode < 300 {
+		logEntry.Info("finished call")
+	} else {
+		logEntry.With("error", resp.Status).Error("finished call with error")
+	}
 
 	return resp, err
 }
