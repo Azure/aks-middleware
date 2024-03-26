@@ -78,7 +78,7 @@ func (p *LoggingPolicy) Do(req *azcorePolicy.Request) (*http.Response, error) {
 	if 200 <= resp.StatusCode && resp.StatusCode < 300 {
 		logEntry.Info("finished call")
 	} else {
-		logEntry.With("error", resp.Status).Error("finished call with error")
+		logEntry.With("error", resp.Status).Error("finished call")
 	}
 
 	return resp, err
