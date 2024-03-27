@@ -30,9 +30,9 @@ func (p *LoggingPolicy) Do(req *azcorePolicy.Request) (*http.Response, error) {
 	parsedURL, parseErr := url.Parse(req.Raw().URL.String())
 	if parseErr != nil {
 		p.logger.With(
-			"grpc.component", "client",
-			"grpc.method", "ERROR",
-			"grpc.service", "ERROR",
+			"component", "client",
+			"method", "ERROR",
+			"service", "ERROR",
 			"url", req.Raw().URL.String(),
 			"error", parseErr.Error(),
 		).Error("Error parsing request URL: ", parseErr)
@@ -42,10 +42,15 @@ func (p *LoggingPolicy) Do(req *azcorePolicy.Request) (*http.Response, error) {
 	trimmedURL := trimURL(*parsedURL)
 	// ex url: "https://management.azure.com/subscriptions/{sub_id}/resourcegroups?api-version={version}"
 	splitPath := strings.Split(trimmedURL, "/")
-	resourceType := splitPath[5]
-	if strings.ContainsAny(resourceType, "?/") {
-		index := strings.IndexAny(resourceType, "?/")
-		resourceType = resourceType[:index]
+	var resourceType string
+	if len(splitPath) > 5 {
+		resourceType = splitPath[5]
+		if strings.ContainsAny(resourceType, "?/") {
+			index := strings.IndexAny(resourceType, "?/")
+			resourceType = resourceType[:index]
+		}
+	} else {
+		resourceType = trimmedURL
 	}
 
 	// REST VERB + Resource Type
@@ -53,9 +58,9 @@ func (p *LoggingPolicy) Do(req *azcorePolicy.Request) (*http.Response, error) {
 	
 	if err != nil {
 		p.logger.With(
-			"grpc.component", "client",
-			"grpc.method", methodInfo,
-			"grpc.service", parsedURL.Host,
+			"component", "client",
+			"method", methodInfo,
+			"service", parsedURL.Host,
 			"url", trimmedURL,
 			"error", err.Error(),
 		).Error("Error finishing request: ", err)
@@ -66,11 +71,11 @@ func (p *LoggingPolicy) Do(req *azcorePolicy.Request) (*http.Response, error) {
 	latency := time.Since(startTime).Milliseconds()
 
 	logEntry := p.logger.With(
-		"grpc.code", resp.StatusCode,
-		"grpc.component", "client",
-		"grpc.time_ms", latency,
-		"grpc.method", methodInfo,
-		"grpc.service", parsedURL.Host,
+		"code", resp.StatusCode,
+		"component", "client",
+		"time_ms", latency,
+		"method", methodInfo,
+		"service", parsedURL.Host,
 		"url", trimmedURL,
 	)
 	
@@ -104,7 +109,7 @@ func GetDefaultArmClientOptions() *armPolicy.ClientOptions {
 	logger := log.New(slog.NewJSONHandler(os.Stdout, nil))
 	policyLogger := logger.With(
 		"source", "ApiAutoLog",
-		"grpc.method_type", "unary",
+		"method_type", "unary",
 		"protocol", "REST",
 	)
 	loggingPolicy := NewLoggingPolicy(*policyLogger)

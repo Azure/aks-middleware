@@ -26,14 +26,14 @@ func (lrt *LoggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, er
 	parts := strings.Split(req.URL.Path, "/")
 	resource := parts[2]
 	logger.With(
-		"grpc.code", resp.StatusCode,
-		"grpc.component", "client",
-		"grpc.time_ms", latency,
-		"grpc.method", req.Method+" "+resource,
-		"grpc.service", req.Host,
+		"code", resp.StatusCode,
+		"component", "client",
+		"time_ms", latency,
+		"method", req.Method+" "+resource,
+		"service", req.Host,
 		"source", "ApiAutoLog",
 		"protocol", "REST",
-		"grpc.method_type", "unary",
+		"method_type", "unary",
 	).Info("finished call")
 
 	return resp, err

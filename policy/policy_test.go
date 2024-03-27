@@ -51,9 +51,9 @@ var _ = Describe("LoggingPolicy", func() {
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 
 			Expect(buf.String()).To(ContainSubstring("finished call"))
-			Expect(buf.String()).To(ContainSubstring(fmt.Sprintf("\"grpc.code\":%d", http.StatusOK)))
-			Expect(buf.String()).To(ContainSubstring(fmt.Sprintf("\"grpc.method\":\"%s", http.MethodGet)))
-			Expect(buf.String()).To(ContainSubstring("\"grpc.time_ms\":"))
+			Expect(buf.String()).To(ContainSubstring(fmt.Sprintf("\"code\":%d", http.StatusOK)))
+			Expect(buf.String()).To(ContainSubstring(fmt.Sprintf("\"method\":\"%s", http.MethodGet)))
+			Expect(buf.String()).To(ContainSubstring("\"time_ms\":"))
 		})
 	})
 })
