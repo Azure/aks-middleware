@@ -52,6 +52,7 @@ func DefaultServerInterceptors(logger log.Logger) []grpc.UnaryServerInterceptor 
 				}
 			}
 			a.Key = strings.TrimPrefix(a.Key, "grpc.")
+			a.Key = strings.ReplaceAll(a.Key, ".", "_")
 			return a
 		},
 	}
