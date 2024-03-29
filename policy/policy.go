@@ -1,7 +1,6 @@
 package policy
 
 import (
-	"log/slog"
 	log "log/slog"
 	"net/http"
 	"net/url"
@@ -12,6 +11,7 @@ import (
 	armPolicy "github.com/Azure/azure-sdk-for-go/sdk/azcore/arm/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	azcorePolicy "github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
+	"google.golang.org/grpc/codes"
 )
 
 type LoggingPolicy struct {
@@ -55,7 +55,7 @@ func (p *LoggingPolicy) Do(req *azcorePolicy.Request) (*http.Response, error) {
 
 	// REST VERB + Resource Type
 	methodInfo := method + " " + resourceType
-	
+
 	if err != nil {
 		p.logger.With(
 			"component", "client",
@@ -78,7 +78,7 @@ func (p *LoggingPolicy) Do(req *azcorePolicy.Request) (*http.Response, error) {
 		"service", parsedURL.Host,
 		"url", trimmedURL,
 	)
-	
+
 	// separate check here b/c previous error check only checks if there was an error in the req
 	if 200 <= resp.StatusCode && resp.StatusCode < 300 {
 		logEntry.Info("finished call")
@@ -106,7 +106,7 @@ func GetDefaultArmClientOptions() *armPolicy.ClientOptions {
 	armClientOptions := new(armPolicy.ClientOptions)
 	armClientOptions.ClientOptions = *clientOptions
 
-	logger := log.New(slog.NewJSONHandler(os.Stdout, nil))
+	logger := log.New(log.NewJSONHandler(os.Stdout, nil))
 	policyLogger := logger.With(
 		"source", "ApiAutoLog",
 		"method_type", "unary",
@@ -121,21 +121,55 @@ func GetDefaultArmClientOptions() *armPolicy.ClientOptions {
 
 func trimURL(parsedURL url.URL) string {
 
-    query := parsedURL.Query()
-    apiVersion := query.Get("api-version")
+	query := parsedURL.Query()
+	apiVersion := query.Get("api-version")
 
-    // Remove all other query parameters
-    for key := range query {
-        if key != "api-version" {
-            query.Del(key)
-        }
-    }
+	// Remove all other query parameters
+	for key := range query {
+		if key != "api-version" {
+			query.Del(key)
+		}
+	}
 
-    // Set the api-version query parameter
-    query.Set("api-version", apiVersion)
+	// Set the api-version query parameter
+	query.Set("api-version", apiVersion)
 
-    // Encode the query parameters and set them in the parsed URL
-    parsedURL.RawQuery = query.Encode()
+	// Encode the query parameters and set them in the parsed URL
+	parsedURL.RawQuery = query.Encode()
 
-    return parsedURL.String()
+	return parsedURL.String()
+}
+
+// Based off of gRPC standard here: https://chromium.googlesource.com/external/github.com/grpc/grpc/+/refs/tags/v1.21.4-pre1/doc/statuscodes.md
+func ConvertHTTPStatusToGRPCError(httpStatusCode int) codes.Code {
+	var code codes.Code
+
+	switch httpStatusCode {
+	case http.StatusOK, http.StatusCreated, http.StatusAccepted:
+		code = codes.OK
+	case http.StatusBadRequest:
+		code = codes.InvalidArgument
+	case http.StatusGatewayTimeout:
+		code = codes.DeadlineExceeded
+	case http.StatusUnauthorized:
+		code = codes.Unauthenticated
+	case http.StatusForbidden:
+		code = codes.PermissionDenied
+	case http.StatusNotFound:
+		code = codes.NotFound
+	case http.StatusConflict:
+		code = codes.Aborted
+	case http.StatusTooManyRequests:
+		code = codes.ResourceExhausted
+	case http.StatusInternalServerError:
+		code = codes.Internal
+	case http.StatusNotImplemented:
+		code = codes.Unimplemented
+	case http.StatusServiceUnavailable:
+		code = codes.Unavailable
+	default:
+		code = codes.Unknown
+	}
+
+	return code
 }
