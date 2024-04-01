@@ -1,13 +1,14 @@
 package interceptor
 
 import (
+	"io"
+
 	"github.com/Azure/aks-middleware/autologger"
 	"github.com/Azure/aks-middleware/ctxlogger"
 	"github.com/Azure/aks-middleware/mdforward"
 	"github.com/Azure/aks-middleware/requestid"
 
 	log "log/slog"
-	"os"
 	"strings"
 
 	"github.com/bufbuild/protovalidate-go"
@@ -18,8 +19,24 @@ import (
 	"google.golang.org/grpc"
 )
 
-func DefaultClientInterceptors(logger log.Logger) []grpc.UnaryClientInterceptor {
-	apiAutologger := logger.With("source", "ApiAutoLog")
+func DefaultClientInterceptors(logger log.Logger, apiOutput io.Writer) []grpc.UnaryClientInterceptor {
+	var apiHandler log.Handler
+
+	apiHandlerOptions := &log.HandlerOptions{
+		ReplaceAttr: func(groups []string, a log.Attr) log.Attr {
+			a.Key = strings.TrimPrefix(a.Key, "grpc.")
+			a.Key = strings.ReplaceAll(a.Key, ".", "_")
+			return a
+		},
+	}
+
+	if _, ok := logger.Handler().(*log.JSONHandler); ok {
+		apiHandler = log.NewJSONHandler(apiOutput, apiHandlerOptions)
+	} else {
+		apiHandler = log.NewTextHandler(apiOutput, apiHandlerOptions)
+	}
+
+	apiAutologger := log.New(apiHandler).With("source", "ApiAutoLog")
 	return []grpc.UnaryClientInterceptor{
 		retry.UnaryClientInterceptor(GetRetryOptions()...),
 		mdforward.UnaryClientInterceptor(),
@@ -32,14 +49,21 @@ func DefaultClientInterceptors(logger log.Logger) []grpc.UnaryClientInterceptor 
 	}
 }
 
-func DefaultServerInterceptors(logger log.Logger) []grpc.UnaryServerInterceptor {
+func DefaultServerInterceptors(logger log.Logger, apiOutput io.Writer, ctxOutput io.Writer) []grpc.UnaryServerInterceptor {
 	// The first registerred interceptor will be called first.
 	// Need to register requestid first to add request-id.
 	// Then the logger can get the request-id.
-	apiAutologger := logger.With("source", "ApiAutoLog")
-	var handler log.Handler
+	var apiHandler log.Handler
+	var ctxHandler log.Handler
 
-	handlerOptions := &log.HandlerOptions{
+	apiHandlerOptions := &log.HandlerOptions{
+		ReplaceAttr: func(groups []string, a log.Attr) log.Attr {
+			a.Key = strings.TrimPrefix(a.Key, "grpc.")
+			a.Key = strings.ReplaceAll(a.Key, ".", "_")
+			return a
+		},
+	}
+	ctxHandlerOptions := &log.HandlerOptions{
 		AddSource: true,
 		ReplaceAttr: func(groups []string, a log.Attr) log.Attr {
 			if a.Key == log.SourceKey {
@@ -58,12 +82,15 @@ func DefaultServerInterceptors(logger log.Logger) []grpc.UnaryServerInterceptor 
 	}
 
 	if _, ok := logger.Handler().(*log.JSONHandler); ok {
-		handler = log.NewJSONHandler(os.Stdout, handlerOptions)
+		apiHandler = log.NewJSONHandler(apiOutput, apiHandlerOptions)
+		ctxHandler = log.NewJSONHandler(ctxOutput, ctxHandlerOptions)
 	} else {
-		handler = log.NewTextHandler(os.Stdout, handlerOptions)
+		apiHandler = log.NewTextHandler(apiOutput, apiHandlerOptions)
+		ctxHandler = log.NewTextHandler(ctxOutput, ctxHandlerOptions)
 	}
 
-	appCtxlogger := log.New(handler).With("source", "CtxLog")
+	apiAutologger := log.New(apiHandler).With("source", "ApiAutoLog")
+	appCtxlogger := log.New(ctxHandler).With("source", "CtxLog")
 	validator, err := protovalidate.New()
 	if err != nil {
 		panic(err)
