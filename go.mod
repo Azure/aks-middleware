@@ -10,6 +10,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.0.1
 	github.com/onsi/ginkgo/v2 v2.13.2
 	github.com/onsi/gomega v1.30.0
+	go.goms.io/aks/rp/toolkit/aksbinversion v0.0.12
 	google.golang.org/grpc v1.60.1
 	google.golang.org/protobuf v1.32.0
 )

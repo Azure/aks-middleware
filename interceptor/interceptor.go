@@ -7,6 +7,7 @@ import (
 	"github.com/Azure/aks-middleware/ctxlogger"
 	"github.com/Azure/aks-middleware/mdforward"
 	"github.com/Azure/aks-middleware/requestid"
+	"go.goms.io/aks/rp/toolkit/aksbinversion"
 
 	log "log/slog"
 	"strings"
@@ -30,8 +31,25 @@ func DefaultClientInterceptors(logger log.Logger, apiOutput io.Writer) []grpc.Un
 		},
 	}
 
+	log.Info("FROM AKS BIN VERSION " + aksbinversion.GetVersion())
+
+	// logger.SetOutput(apiOutput)
+
+	// // Extract all fields from the record
+	// var attrs []slog.Attr
+	// record.Attrs(func(attr slog.Attr) bool {
+	// 	attrs = append(attrs, attr)
+	// 	return true // Continue iterating
+	// })
+
+	// // Now 'attrs' contains all the dynamically determined fields
+	// for key, value := range attrs {
+	// 	fmt.Printf("Field: %s, Value: %v\n", key, value)
+	// }
+
 	if _, ok := logger.Handler().(*log.JSONHandler); ok {
 		apiHandler = log.NewJSONHandler(apiOutput, apiHandlerOptions)
+		// apiHandler.WithAttrs(attrs)
 	} else {
 		apiHandler = log.NewTextHandler(apiOutput, apiHandlerOptions)
 	}
