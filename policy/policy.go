@@ -47,7 +47,13 @@ func (p *LoggingPolicy) Do(req *azcorePolicy.Request) (*http.Response, error) {
 		resourceType = splitPath[5]
 		if strings.ContainsAny(resourceType, "?/") {
 			index := strings.IndexAny(resourceType, "?/")
-			resourceType = resourceType[:index]
+			// No resource name is present, must be LIST operation
+			resourceType = resourceType[:index] + " - LIST"
+			// validate resource name to check if read operation
+			// validation based on length to differentiate from polling operation:
+			// https://azure.github.io/PSRule.Rules.Azure/en/rules/Azure.ResourceGroup.Name/
+		} else if method == "GET" && len(splitPath[6]) <= 90 {
+			resourceType = resourceType + " - READ"
 		}
 	} else {
 		resourceType = trimmedURL

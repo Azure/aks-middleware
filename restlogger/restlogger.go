@@ -25,6 +25,14 @@ func (lrt *LoggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, er
 	logger := log.New(log.NewJSONHandler(os.Stdout, nil))
 	parts := strings.Split(req.URL.Path, "/")
 	resource := parts[2]
+	if req.Method == "GET" {
+		// resource name is specified, so it is a READ op
+		if len(parts) >= 4 {
+			resource = resource + " - READ"
+		} else {
+			resource = resource + " - LIST"
+		}
+	}
 	logger.With(
 		"code", resp.StatusCode,
 		"component", "client",
