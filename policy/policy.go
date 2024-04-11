@@ -4,7 +4,6 @@ import (
 	log "log/slog"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"time"
 
@@ -99,7 +98,7 @@ func (p *LoggingPolicy) Clone() azcorePolicy.Policy {
 	return &LoggingPolicy{logger: p.logger}
 }
 
-func GetDefaultArmClientOptions() *armPolicy.ClientOptions {
+func GetDefaultArmClientOptions(logger *log.Logger) *armPolicy.ClientOptions {
 	logOptions := new(policy.LogOptions)
 
 	retryOptions := new(policy.RetryOptions)
@@ -112,7 +111,6 @@ func GetDefaultArmClientOptions() *armPolicy.ClientOptions {
 	armClientOptions := new(armPolicy.ClientOptions)
 	armClientOptions.ClientOptions = *clientOptions
 
-	logger := log.New(log.NewJSONHandler(os.Stdout, nil))
 	policyLogger := logger.With(
 		"source", "ApiAutoLog",
 		"method_type", "unary",

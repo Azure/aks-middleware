@@ -7,7 +7,6 @@ import (
 	"github.com/Azure/aks-middleware/ctxlogger"
 	"github.com/Azure/aks-middleware/mdforward"
 	"github.com/Azure/aks-middleware/requestid"
-	"go.goms.io/aks/rp/toolkit/aksbinversion"
 
 	log "log/slog"
 	"strings"
@@ -20,7 +19,21 @@ import (
 	"google.golang.org/grpc"
 )
 
-func DefaultClientInterceptors(logger log.Logger, apiOutput io.Writer) []grpc.UnaryClientInterceptor {
+type ClientInterceptorOptions struct {
+	Logger     *log.Logger
+	APIOutput  io.Writer
+	Attributes []log.Attr
+}
+
+type ServerInterceptorOptions struct {
+	Logger     *log.Logger
+	APIOutput  io.Writer
+	CtxOutput  io.Writer 
+	APIAttributes []log.Attr
+	CtxAttributes []log.Attr
+}
+
+func DefaultClientInterceptors(clientInterceptorOptions ClientInterceptorOptions) []grpc.UnaryClientInterceptor {
 	var apiHandler log.Handler
 
 	apiHandlerOptions := &log.HandlerOptions{
@@ -31,28 +44,13 @@ func DefaultClientInterceptors(logger log.Logger, apiOutput io.Writer) []grpc.Un
 		},
 	}
 
-	log.Info("FROM AKS BIN VERSION " + aksbinversion.GetVersion())
-
-	// logger.SetOutput(apiOutput)
-
-	// // Extract all fields from the record
-	// var attrs []slog.Attr
-	// record.Attrs(func(attr slog.Attr) bool {
-	// 	attrs = append(attrs, attr)
-	// 	return true // Continue iterating
-	// })
-
-	// // Now 'attrs' contains all the dynamically determined fields
-	// for key, value := range attrs {
-	// 	fmt.Printf("Field: %s, Value: %v\n", key, value)
-	// }
-
-	if _, ok := logger.Handler().(*log.JSONHandler); ok {
-		apiHandler = log.NewJSONHandler(apiOutput, apiHandlerOptions)
-		// apiHandler.WithAttrs(attrs)
+	if _, ok := clientInterceptorOptions.Logger.Handler().(*log.JSONHandler); ok {
+		apiHandler = log.NewJSONHandler(clientInterceptorOptions.APIOutput, apiHandlerOptions)
 	} else {
-		apiHandler = log.NewTextHandler(apiOutput, apiHandlerOptions)
+		apiHandler = log.NewTextHandler(clientInterceptorOptions.APIOutput, apiHandlerOptions)
 	}
+
+	apiHandler = apiHandler.WithAttrs(clientInterceptorOptions.Attributes)
 
 	apiAutologger := log.New(apiHandler).With("source", "ApiAutoLog")
 	return []grpc.UnaryClientInterceptor{
@@ -67,7 +65,7 @@ func DefaultClientInterceptors(logger log.Logger, apiOutput io.Writer) []grpc.Un
 	}
 }
 
-func DefaultServerInterceptors(logger log.Logger, apiOutput io.Writer, ctxOutput io.Writer) []grpc.UnaryServerInterceptor {
+func DefaultServerInterceptors(serverInterceptorOptions ServerInterceptorOptions) []grpc.UnaryServerInterceptor {
 	// The first registerred interceptor will be called first.
 	// Need to register requestid first to add request-id.
 	// Then the logger can get the request-id.
@@ -99,13 +97,16 @@ func DefaultServerInterceptors(logger log.Logger, apiOutput io.Writer, ctxOutput
 		},
 	}
 
-	if _, ok := logger.Handler().(*log.JSONHandler); ok {
-		apiHandler = log.NewJSONHandler(apiOutput, apiHandlerOptions)
-		ctxHandler = log.NewJSONHandler(ctxOutput, ctxHandlerOptions)
+	if _, ok := serverInterceptorOptions.Logger.Handler().(*log.JSONHandler); ok {
+		apiHandler = log.NewJSONHandler(serverInterceptorOptions.APIOutput, apiHandlerOptions)
+		ctxHandler = log.NewJSONHandler(serverInterceptorOptions.CtxOutput, ctxHandlerOptions)
 	} else {
-		apiHandler = log.NewTextHandler(apiOutput, apiHandlerOptions)
-		ctxHandler = log.NewTextHandler(ctxOutput, ctxHandlerOptions)
+		apiHandler = log.NewTextHandler(serverInterceptorOptions.APIOutput, apiHandlerOptions)
+		ctxHandler = log.NewTextHandler(serverInterceptorOptions.CtxOutput, ctxHandlerOptions)
 	}
+
+	apiHandler = apiHandler.WithAttrs(serverInterceptorOptions.APIAttributes)
+	ctxHandler = ctxHandler.WithAttrs(serverInterceptorOptions.CtxAttributes)
 
 	apiAutologger := log.New(apiHandler).With("source", "ApiAutoLog")
 	appCtxlogger := log.New(ctxHandler).With("source", "CtxLog")

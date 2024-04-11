@@ -3,13 +3,13 @@ package restlogger
 import (
 	log "log/slog"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 )
 
 type LoggingRoundTripper struct {
 	Proxied http.RoundTripper
+	Logger  *log.Logger
 }
 
 func (lrt *LoggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -22,7 +22,6 @@ func (lrt *LoggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, er
 
 	latency := time.Since(start).Milliseconds()
 
-	logger := log.New(log.NewJSONHandler(os.Stdout, nil))
 	parts := strings.Split(req.URL.Path, "/")
 	resource := parts[2]
 	if req.Method == "GET" {
@@ -33,7 +32,7 @@ func (lrt *LoggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, er
 			resource = resource + " - LIST"
 		}
 	}
-	logger.With(
+	lrt.Logger.With(
 		"code", resp.StatusCode,
 		"component", "client",
 		"time_ms", latency,
@@ -47,10 +46,11 @@ func (lrt *LoggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, er
 	return resp, err
 }
 
-func NewLoggingClient() *http.Client {
+func NewLoggingClient(logger *log.Logger) *http.Client {
 	return &http.Client{
 		Transport: &LoggingRoundTripper{
 			Proxied: http.DefaultTransport,
+			Logger:  logger,
 		},
 	}
 }
