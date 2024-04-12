@@ -2,6 +2,7 @@ package interceptor
 
 import (
 	"io"
+	"os"
 
 	"github.com/Azure/aks-middleware/autologger"
 	"github.com/Azure/aks-middleware/ctxlogger"
@@ -19,21 +20,39 @@ import (
 	"google.golang.org/grpc"
 )
 
-type ClientInterceptorOptions struct {
+type ClientInterceptorLogOptions struct {
 	Logger     *log.Logger
 	APIOutput  io.Writer
 	Attributes []log.Attr
 }
 
-type ServerInterceptorOptions struct {
-	Logger     *log.Logger
-	APIOutput  io.Writer
-	CtxOutput  io.Writer 
+type ServerInterceptorLogOptions struct {
+	Logger        *log.Logger
+	APIOutput     io.Writer
+	CtxOutput     io.Writer
 	APIAttributes []log.Attr
 	CtxAttributes []log.Attr
 }
 
-func DefaultClientInterceptors(clientInterceptorOptions ClientInterceptorOptions) []grpc.UnaryClientInterceptor {
+func GetClientInterceptorLogOptions(logger *log.Logger, attrs []log.Attr) ClientInterceptorLogOptions {
+	return ClientInterceptorLogOptions{
+		Logger:     logger,
+		APIOutput:  os.Stdout,
+		Attributes: attrs,
+	}
+}
+
+func GetServerInterceptorLogOptions(logger *log.Logger, attrs []log.Attr) ServerInterceptorLogOptions {
+	return ServerInterceptorLogOptions{
+		Logger:        logger,
+		APIOutput:     os.Stdout,
+		CtxOutput:     os.Stdout,
+		APIAttributes: attrs,
+		CtxAttributes: attrs,
+	}
+}
+
+func DefaultClientInterceptors(options ClientInterceptorLogOptions) []grpc.UnaryClientInterceptor {
 	var apiHandler log.Handler
 
 	apiHandlerOptions := &log.HandlerOptions{
@@ -44,13 +63,13 @@ func DefaultClientInterceptors(clientInterceptorOptions ClientInterceptorOptions
 		},
 	}
 
-	if _, ok := clientInterceptorOptions.Logger.Handler().(*log.JSONHandler); ok {
-		apiHandler = log.NewJSONHandler(clientInterceptorOptions.APIOutput, apiHandlerOptions)
+	if _, ok := options.Logger.Handler().(*log.JSONHandler); ok {
+		apiHandler = log.NewJSONHandler(options.APIOutput, apiHandlerOptions)
 	} else {
-		apiHandler = log.NewTextHandler(clientInterceptorOptions.APIOutput, apiHandlerOptions)
+		apiHandler = log.NewTextHandler(options.APIOutput, apiHandlerOptions)
 	}
 
-	apiHandler = apiHandler.WithAttrs(clientInterceptorOptions.Attributes)
+	apiHandler = apiHandler.WithAttrs(options.Attributes)
 
 	apiAutologger := log.New(apiHandler).With("source", "ApiAutoLog")
 	return []grpc.UnaryClientInterceptor{
@@ -65,7 +84,7 @@ func DefaultClientInterceptors(clientInterceptorOptions ClientInterceptorOptions
 	}
 }
 
-func DefaultServerInterceptors(serverInterceptorOptions ServerInterceptorOptions) []grpc.UnaryServerInterceptor {
+func DefaultServerInterceptors(options ServerInterceptorLogOptions) []grpc.UnaryServerInterceptor {
 	// The first registerred interceptor will be called first.
 	// Need to register requestid first to add request-id.
 	// Then the logger can get the request-id.
@@ -97,16 +116,16 @@ func DefaultServerInterceptors(serverInterceptorOptions ServerInterceptorOptions
 		},
 	}
 
-	if _, ok := serverInterceptorOptions.Logger.Handler().(*log.JSONHandler); ok {
-		apiHandler = log.NewJSONHandler(serverInterceptorOptions.APIOutput, apiHandlerOptions)
-		ctxHandler = log.NewJSONHandler(serverInterceptorOptions.CtxOutput, ctxHandlerOptions)
+	if _, ok := options.Logger.Handler().(*log.JSONHandler); ok {
+		apiHandler = log.NewJSONHandler(options.APIOutput, apiHandlerOptions)
+		ctxHandler = log.NewJSONHandler(options.CtxOutput, ctxHandlerOptions)
 	} else {
-		apiHandler = log.NewTextHandler(serverInterceptorOptions.APIOutput, apiHandlerOptions)
-		ctxHandler = log.NewTextHandler(serverInterceptorOptions.CtxOutput, ctxHandlerOptions)
+		apiHandler = log.NewTextHandler(options.APIOutput, apiHandlerOptions)
+		ctxHandler = log.NewTextHandler(options.CtxOutput, ctxHandlerOptions)
 	}
 
-	apiHandler = apiHandler.WithAttrs(serverInterceptorOptions.APIAttributes)
-	ctxHandler = ctxHandler.WithAttrs(serverInterceptorOptions.CtxAttributes)
+	apiHandler = apiHandler.WithAttrs(options.APIAttributes)
+	ctxHandler = ctxHandler.WithAttrs(options.CtxAttributes)
 
 	apiAutologger := log.New(apiHandler).With("source", "ApiAutoLog")
 	appCtxlogger := log.New(ctxHandler).With("source", "CtxLog")
