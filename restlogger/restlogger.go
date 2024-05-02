@@ -7,6 +7,8 @@ import (
 	"time"
 )
 
+var resourceTypes = [4]string{"resourcegroups", "storageaccounts", "operationresults", "asyncoperations"}
+
 type LoggingRoundTripper struct {
 	Proxied http.RoundTripper
 	Logger  *log.Logger
@@ -23,10 +25,27 @@ func (lrt *LoggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, er
 	latency := time.Since(start).Milliseconds()
 
 	parts := strings.Split(req.URL.Path, "/")
-	resource := parts[2]
+	resource := ""
+	foundResource := false
+	// Start from the end of the split path and move backward
+	counter := 0
+	for counter = len(parts) - 1; counter >= 0; counter-- {
+		resource = parts[counter]
+		for _, rType := range resourceTypes {
+			if strings.Compare(resource, rType) == 0 {
+				// Found the appropriate resource type
+				foundResource = true
+				break
+			}
+		}
+		if foundResource {
+			break
+		}
+	}
+
 	if req.Method == "GET" {
 		// resource name is specified, so it is a READ op
-		if len(parts) >= 4 {
+		if counter != len(parts)-1 {
 			resource = resource + " - READ"
 		} else {
 			resource = resource + " - LIST"

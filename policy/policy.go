@@ -13,6 +13,8 @@ import (
 	"google.golang.org/grpc/codes"
 )
 
+var resourceTypes = [4]string{"resourcegroups", "storageAccounts", "operationresults", "asyncoperations"}
+
 type LoggingPolicy struct {
 	logger log.Logger
 }
@@ -38,22 +40,41 @@ func (p *LoggingPolicy) Do(req *azcorePolicy.Request) (*http.Response, error) {
 		return nil, parseErr
 	}
 
+	// Example URLs: "https://management.azure.com/subscriptions/{sub_id}/resourcegroups?api-version={version}"
+	// https://management.azure.com/subscriptions/{sub_id}/resourceGroups/{rg_name}/providers/Microsoft.Storage/storageAccounts/{sa_name}?api-version={version}
 	trimmedURL := trimURL(*parsedURL)
-	// ex url: "https://management.azure.com/subscriptions/{sub_id}/resourcegroups?api-version={version}"
 	splitPath := strings.Split(trimmedURL, "/")
 	var resourceType string
-	if len(splitPath) > 5 {
-		resourceType = splitPath[5]
-		if strings.ContainsAny(resourceType, "?/") {
-			index := strings.IndexAny(resourceType, "?/")
-			// No resource name is present, must be LIST operation
-			resourceType = resourceType[:index] + " - LIST"
-			// validate resource name to check if read operation
-			// validation based on length to differentiate from polling operation:
-			// https://azure.github.io/PSRule.Rules.Azure/en/rules/Azure.ResourceGroup.Name/
-		} else if method == "GET" && len(splitPath[6]) <= 90 {
-			resourceType = resourceType + " - READ"
+
+	// Find the index of element that contains "api-version" in the URL
+	apiVersionIndex := -1
+	for i, segment := range splitPath {
+		if strings.Contains(segment, "api-version") {
+			apiVersionIndex = i
+			break
 		}
+	}
+
+	if apiVersionIndex > 0 {
+		// The resource type is the segment right before "api-version"
+		resourceType = splitPath[apiVersionIndex]
+		for _, rt := range resourceTypes {
+			if strings.Contains(splitPath[apiVersionIndex-1], rt) {
+				resourceType = rt
+				break
+			}
+		}
+
+		if method == "GET" {
+			if strings.ContainsAny(resourceType, "?/") {
+				// No resource name is present after resource type, must be a LIST operation
+				index := strings.IndexAny(resourceType, "?/")
+				resourceType = resourceType[:index] + " - LIST"
+			} else {
+				resourceType = resourceType + " - READ"
+			}
+		}
+
 	} else {
 		resourceType = trimmedURL
 	}
