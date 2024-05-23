@@ -3,11 +3,10 @@ package restlogger
 import (
 	log "log/slog"
 	"net/http"
-	"strings"
 	"time"
-)
 
-var resourceTypes = [4]string{"resourcegroups", "storageaccounts", "operationresults", "asyncoperations"}
+	"github.com/Azure/aks-middleware/logging"
+)
 
 type LoggingRoundTripper struct {
 	Proxied http.RoundTripper
@@ -18,48 +17,34 @@ func (lrt *LoggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, er
 	start := time.Now()
 
 	resp, err := lrt.Proxied.RoundTrip(req)
+	methodInfo := logging.GetMethodInfo(req.Method, req.URL.Path)
 	if err != nil {
+		lrt.Logger.With(
+			"code", "na",
+			"component", "client",
+			"time_ms", "na",
+			"method", methodInfo,
+			"service", req.Host,
+			"source", "ApiAutoLog",
+			"protocol", "REST",
+			"method_type", "unary",
+			"url", req.URL.Path,
+			"error", err.Error(),
+		).Error("error finishing call")
 		return resp, err
 	}
 
 	latency := time.Since(start).Milliseconds()
-
-	parts := strings.Split(req.URL.Path, "/")
-	resource := ""
-	foundResource := false
-	// Start from the end of the split path and move backward
-	counter := 0
-	for counter = len(parts) - 1; counter >= 0; counter-- {
-		resource = parts[counter]
-		for _, rType := range resourceTypes {
-			if strings.Compare(resource, rType) == 0 {
-				// Found the appropriate resource type
-				foundResource = true
-				break
-			}
-		}
-		if foundResource {
-			break
-		}
-	}
-
-	if req.Method == "GET" {
-		// resource name is specified, so it is a READ op
-		if counter != len(parts)-1 {
-			resource = resource + " - READ"
-		} else {
-			resource = resource + " - LIST"
-		}
-	}
 	lrt.Logger.With(
 		"code", resp.StatusCode,
 		"component", "client",
 		"time_ms", latency,
-		"method", req.Method+" "+resource,
+		"method", methodInfo,
 		"service", req.Host,
 		"source", "ApiAutoLog",
 		"protocol", "REST",
 		"method_type", "unary",
+		"url", req.URL.Path,
 	).Info("finished call")
 
 	return resp, err

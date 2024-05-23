@@ -4,16 +4,14 @@ import (
 	log "log/slog"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 
+	"github.com/Azure/aks-middleware/logging"
 	armPolicy "github.com/Azure/azure-sdk-for-go/sdk/azcore/arm/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	azcorePolicy "github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"google.golang.org/grpc/codes"
 )
-
-var resourceTypes = [4]string{"resourcegroups", "storageAccounts", "operationresults", "asyncoperations"}
 
 type LoggingPolicy struct {
 	logger log.Logger
@@ -31,65 +29,33 @@ func (p *LoggingPolicy) Do(req *azcorePolicy.Request) (*http.Response, error) {
 	parsedURL, parseErr := url.Parse(req.Raw().URL.String())
 	if parseErr != nil {
 		p.logger.With(
+			"code", "na",
 			"component", "client",
-			"method", "ERROR",
-			"service", "ERROR",
+			"time_ms", "na",
+			"method", "na",
+			"service", "na",
 			"url", req.Raw().URL.String(),
 			"error", parseErr.Error(),
-		).Error("Error parsing request URL: ", parseErr)
+		).Error("error parsing request URL")
 		return nil, parseErr
 	}
 
 	// Example URLs: "https://management.azure.com/subscriptions/{sub_id}/resourcegroups?api-version={version}"
 	// https://management.azure.com/subscriptions/{sub_id}/resourceGroups/{rg_name}/providers/Microsoft.Storage/storageAccounts/{sa_name}?api-version={version}
 	trimmedURL := trimURL(*parsedURL)
-	splitPath := strings.Split(trimmedURL, "/")
-	var resourceType string
 
-	// Find the index of element that contains "api-version" in the URL
-	apiVersionIndex := -1
-	for i, segment := range splitPath {
-		if strings.Contains(segment, "api-version") {
-			apiVersionIndex = i
-			break
-		}
-	}
-
-	if apiVersionIndex > 0 {
-		// The resource type is the segment right before "api-version"
-		resourceType = splitPath[apiVersionIndex]
-		for _, rt := range resourceTypes {
-			if strings.Contains(splitPath[apiVersionIndex-1], rt) {
-				resourceType = rt
-				break
-			}
-		}
-
-		if method == "GET" {
-			if strings.ContainsAny(resourceType, "?/") {
-				// No resource name is present after resource type, must be a LIST operation
-				index := strings.IndexAny(resourceType, "?/")
-				resourceType = resourceType[:index] + " - LIST"
-			} else {
-				resourceType = resourceType + " - READ"
-			}
-		}
-
-	} else {
-		resourceType = trimmedURL
-	}
-
-	// REST VERB + Resource Type
-	methodInfo := method + " " + resourceType
+	methodInfo := logging.GetMethodInfo(method, trimmedURL)
 
 	if err != nil {
 		p.logger.With(
+			"code", "na",
 			"component", "client",
+			"time_ms", "na",
 			"method", methodInfo,
 			"service", parsedURL.Host,
 			"url", trimmedURL,
 			"error", err.Error(),
-		).Error("Error finishing request: ", err)
+		).Error("error finishing call")
 		return nil, err
 	}
 
