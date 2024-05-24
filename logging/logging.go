@@ -32,7 +32,7 @@ func GetMethodInfo(method string, rawURL string) string {
 		if counter != len(parts)-1 {
 			resource = resource + " - READ"
 		} else {
-			resource = resource + " - LISTING"
+			resource = resource + " - LIST"
 		}
 	}
 
