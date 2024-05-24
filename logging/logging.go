@@ -4,16 +4,11 @@ import (
 	"strings"
 )
 
-// TODO: Get this info dynamically
-var resourceTypes = [4]string{"resourcegroups", "storageAccounts", "operationresults", "asyncoperations"}
-
-func isValidResource(token string) bool {
-	for _, rType := range resourceTypes {
-		if strings.Compare(token, rType) == 0 {
-			return true
-		}
-	}
-	return false
+var resourceTypes = map[string]bool{
+	"resourcegroups":   true,
+	"storageaccounts":  true,
+	"operationresults": true,
+	"asyncoperations":  true,
 }
 
 // Shared logging function for REST API interactions
@@ -21,12 +16,12 @@ func GetMethodInfo(method string, rawURL string) string {
 	url := strings.Split(rawURL, "?api-version")
 	parts := strings.Split(url[0], "/")
 	resource := url[0]
+	counter := 0
 	// Start from the end of the split path and move backward
 	// to get nested resource type
-	counter := 0
 	for counter = len(parts) - 1; counter >= 0; counter-- {
 		currToken := parts[counter]
-		if isValidResource(currToken) {
+		if resourceTypes[strings.ToLower(currToken)] {
 			resource = currToken
 			break
 		}
@@ -37,7 +32,7 @@ func GetMethodInfo(method string, rawURL string) string {
 		if counter != len(parts)-1 {
 			resource = resource + " - READ"
 		} else {
-			resource = resource + " - LIST"
+			resource = resource + " - LISTING"
 		}
 	}
 
@@ -45,5 +40,4 @@ func GetMethodInfo(method string, rawURL string) string {
 	methodInfo := method + " " + resource
 
 	return methodInfo
-
 }
