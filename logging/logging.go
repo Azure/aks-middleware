@@ -7,8 +7,6 @@ import (
 // TODO: Get this info dynamically
 var resourceTypes = [4]string{"resourcegroups", "storageAccounts", "operationresults", "asyncoperations"}
 
-// Shared logging function for REST API interactions
-
 func isValidResource(token string) bool {
 	for _, rType := range resourceTypes {
 		if strings.Compare(token, rType) == 0 {
