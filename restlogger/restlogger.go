@@ -15,19 +15,20 @@ type LoggingRoundTripper struct {
 
 func (lrt *LoggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	start := time.Now()
-
+	logEntry := lrt.Logger.With(
+		"source", "ApiAutoLog",
+		"protocol", "REST",
+		"method_type", "unary",
+	)
 	resp, err := lrt.Proxied.RoundTrip(req)
 	methodInfo := logging.GetMethodInfo(req.Method, req.URL.Path)
 	if err != nil {
-		lrt.Logger.With(
+		logEntry.With(
 			"code", "na",
 			"component", "client",
 			"time_ms", "na",
 			"method", methodInfo,
 			"service", req.Host,
-			"source", "ApiAutoLog",
-			"protocol", "REST",
-			"method_type", "unary",
 			"url", req.URL.Path,
 			"error", err.Error(),
 		).Error("error finishing call")
@@ -35,16 +36,14 @@ func (lrt *LoggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, er
 	}
 
 	latency := time.Since(start).Milliseconds()
-	lrt.Logger.With(
+	logEntry.With(
 		"code", resp.StatusCode,
 		"component", "client",
 		"time_ms", latency,
 		"method", methodInfo,
 		"service", req.Host,
-		"source", "ApiAutoLog",
-		"protocol", "REST",
-		"method_type", "unary",
 		"url", req.URL.Path,
+		"error", "na",
 	).Info("finished call")
 
 	return resp, err

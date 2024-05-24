@@ -9,24 +9,26 @@ var resourceTypes = [4]string{"resourcegroups", "storageAccounts", "operationres
 
 // Shared logging function for REST API interactions
 
+func isValidResource(token string) bool {
+	for _, rType := range resourceTypes {
+		if strings.Compare(token, rType) == 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// Shared logging function for REST API interactions
 func GetMethodInfo(method string, rawURL string) string {
 	url := strings.Split(rawURL, "?api-version")
 	parts := strings.Split(url[0], "/")
 	resource := url[0]
-	foundResource := false
 	// Start from the end of the split path and move backward
 	// to get nested resource type
 	counter := 0
 	for counter = len(parts) - 1; counter >= 0; counter-- {
 		currToken := parts[counter]
-		for _, rType := range resourceTypes {
-			if strings.Compare(currToken, rType) == 0 {
-				// Found the appropriate resource type
-				foundResource = true
-				break
-			}
-		}
-		if foundResource {
+		if isValidResource(currToken) {
 			resource = currToken
 			break
 		}
