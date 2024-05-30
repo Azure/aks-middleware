@@ -8,7 +8,6 @@ import (
 
 	"github.com/Azure/aks-middleware/logging"
 	armPolicy "github.com/Azure/azure-sdk-for-go/sdk/azcore/arm/policy"
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	azcorePolicy "github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"google.golang.org/grpc/codes"
 )
@@ -25,7 +24,6 @@ func (p *LoggingPolicy) Do(req *azcorePolicy.Request) (*http.Response, error) {
 	startTime := time.Now()
 	resp, err := req.Next()
 
-	method := req.Raw().Method
 	parsedURL, parseErr := url.Parse(req.Raw().URL.String())
 	if parseErr != nil {
 		p.logger.With(
@@ -37,47 +35,20 @@ func (p *LoggingPolicy) Do(req *azcorePolicy.Request) (*http.Response, error) {
 			"url", req.Raw().URL.String(),
 			"error", parseErr.Error(),
 		).Error("error parsing request URL")
-		return nil, parseErr
-	}
-
-	// Example URLs: "https://management.azure.com/subscriptions/{sub_id}/resourcegroups?api-version={version}"
-	// https://management.azure.com/subscriptions/{sub_id}/resourceGroups/{rg_name}/providers/Microsoft.Storage/storageAccounts/{sa_name}?api-version={version}
-	trimmedURL := trimURL(*parsedURL)
-
-	methodInfo := logging.GetMethodInfo(method, trimmedURL)
-
-	if err != nil {
-		p.logger.With(
-			"code", "na",
-			"component", "client",
-			"time_ms", "na",
-			"method", methodInfo,
-			"service", parsedURL.Host,
-			"url", trimmedURL,
-			"error", err.Error(),
-		).Error("error finishing call")
-		return nil, err
-	}
-
-	// Time is in ms
-	latency := time.Since(startTime).Milliseconds()
-
-	logEntry := p.logger.With(
-		"code", resp.StatusCode,
-		"component", "client",
-		"time_ms", latency,
-		"method", methodInfo,
-		"service", parsedURL.Host,
-		"url", trimmedURL,
-	)
-
-	// separate check here b/c previous error check only checks if there was an error in the req
-	if 200 <= resp.StatusCode && resp.StatusCode < 300 {
-		logEntry.With("error", "na").Info("finished call")
 	} else {
-		logEntry.With("error", resp.Status).Error("finished call")
+		// Example URLs: "https://management.azure.com/subscriptions/{sub_id}/resourcegroups?api-version={version}"
+		// https://management.azure.com/subscriptions/{sub_id}/resourceGroups/{rg_name}/providers/Microsoft.Storage/storageAccounts/{sa_name}?api-version={version}
+		trimmedURL := trimURL(*parsedURL)
+		req.Raw().URL.Path = trimmedURL
 	}
 
+	logging.LogRequest(logging.LogRequestParams{
+		Logger:    &p.logger,
+		StartTime: startTime,
+		Request:   req.Raw(),
+		Response:  resp,
+		Error:     err,
+	})
 	return resp, err
 }
 
@@ -86,12 +57,12 @@ func (p *LoggingPolicy) Clone() azcorePolicy.Policy {
 }
 
 func GetDefaultArmClientOptions(logger *log.Logger) *armPolicy.ClientOptions {
-	logOptions := new(policy.LogOptions)
+	logOptions := new(azcorePolicy.LogOptions)
 
-	retryOptions := new(policy.RetryOptions)
+	retryOptions := new(azcorePolicy.RetryOptions)
 	retryOptions.MaxRetries = 5
 
-	clientOptions := new(policy.ClientOptions)
+	clientOptions := new(azcorePolicy.ClientOptions)
 	clientOptions.Logging = *logOptions
 	clientOptions.Retry = *retryOptions
 
