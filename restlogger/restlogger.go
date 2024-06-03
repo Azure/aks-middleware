@@ -22,6 +22,7 @@ func (lrt *LoggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, er
 		Request:   req,
 		Response:  resp,
 		Error:     err,
+		URL:       req.URL.String(),
 	})
 	return resp, err
 }

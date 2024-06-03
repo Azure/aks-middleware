@@ -22,13 +22,18 @@ type LogRequestParams struct {
 	Request   interface{}
 	Response  *http.Response
 	Error     error
+	URL       string
 }
 
 // Shared logging function for REST API interactions
 func GetMethodInfo(method string, rawURL string) string {
-	url := strings.Split(rawURL, "?api-version")
-	parts := strings.Split(url[0], "/")
-	resource := url[0]
+	urlParts := strings.Split(rawURL, "?api-version")
+	// malformed url
+	if len(urlParts) < 2 {
+		return method + " " + rawURL
+	}
+	parts := strings.Split(urlParts[0], "/")
+	resource := urlParts[0]
 	counter := 0
 	// Start from the end of the split path and move backward
 	// to get nested resource type
@@ -56,15 +61,14 @@ func GetMethodInfo(method string, rawURL string) string {
 }
 
 func LogRequest(params LogRequestParams) {
-	var method, rawURL, service string
+	var method, service string
+	rawURL := params.URL
 	switch req := params.Request.(type) {
 	case *http.Request:
 		method = req.Method
-		rawURL = req.URL.String()
 		service = req.Host
 	case *azcorePolicy.Request:
 		method = req.Raw().Method
-		rawURL = req.Raw().URL.String()
 		service = req.Raw().Host
 	default:
 		return // Unknown request type, do nothing
@@ -76,19 +80,6 @@ func LogRequest(params LogRequestParams) {
 		"protocol", "REST",
 		"method_type", "unary",
 	)
-
-	if params.Error != nil {
-		logEntry.With(
-			"code", "na",
-			"component", "client",
-			"time_ms", "na",
-			"method", methodInfo,
-			"service", service,
-			"url", rawURL,
-			"error", params.Error.Error(),
-		).Error("error finishing call")
-		return
-	}
 
 	latency := time.Since(params.StartTime).Milliseconds()
 	logEntry = logEntry.With(
@@ -102,6 +93,8 @@ func LogRequest(params LogRequestParams) {
 
 	if 200 <= params.Response.StatusCode && params.Response.StatusCode < 300 {
 		logEntry.With("error", "na").Info("finished call")
+	} else if params.Error != nil {
+		logEntry.With("error", params.Error.Error()).Error("finished call")
 	} else {
 		logEntry.With("error", params.Response.Status).Error("finished call")
 	}

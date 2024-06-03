@@ -33,4 +33,12 @@ var _ = Describe("GetMethodInfo", func() {
 			Expect(logging.GetMethodInfo(method, url)).To(Equal(expected))
 		})
 	})
+	Context("when URL is malformed", func() {
+		It("returns the correct method with the entire URL", func() {
+			method := "GET"
+			url := "https://management.azure.com/subscriptions/sub_id/resourceGroups/rg_name/providers/Microsoft.Storage/storageAccounts/account_name/api-version=version"
+			expected := "GET https://management.azure.com/subscriptions/sub_id/resourceGroups/rg_name/providers/Microsoft.Storage/storageAccounts/account_name/api-version=version"
+			Expect(logging.GetMethodInfo(method, url)).To(Equal(expected))
+		})
+	})
 })

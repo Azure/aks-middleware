@@ -23,8 +23,8 @@ func NewLoggingPolicy(logger log.Logger) *LoggingPolicy {
 func (p *LoggingPolicy) Do(req *azcorePolicy.Request) (*http.Response, error) {
 	startTime := time.Now()
 	resp, err := req.Next()
-
-	parsedURL, parseErr := url.Parse(req.Raw().URL.String())
+	requestURL := req.Raw().URL.String()
+	parsedURL, parseErr := url.Parse(requestURL)
 	if parseErr != nil {
 		p.logger.With(
 			"code", "na",
@@ -38,8 +38,7 @@ func (p *LoggingPolicy) Do(req *azcorePolicy.Request) (*http.Response, error) {
 	} else {
 		// Example URLs: "https://management.azure.com/subscriptions/{sub_id}/resourcegroups?api-version={version}"
 		// https://management.azure.com/subscriptions/{sub_id}/resourceGroups/{rg_name}/providers/Microsoft.Storage/storageAccounts/{sa_name}?api-version={version}
-		trimmedURL := trimURL(*parsedURL)
-		req.Raw().URL.Path = trimmedURL
+		requestURL = trimURL(*parsedURL)
 	}
 
 	logging.LogRequest(logging.LogRequestParams{
@@ -48,6 +47,7 @@ func (p *LoggingPolicy) Do(req *azcorePolicy.Request) (*http.Response, error) {
 		Request:   req.Raw(),
 		Response:  resp,
 		Error:     err,
+		URL:       requestURL,
 	})
 	return resp, err
 }
