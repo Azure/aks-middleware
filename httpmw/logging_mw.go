@@ -5,15 +5,19 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-
-	"github.com/Azure/aks-middleware/ctxlogger"
 )
 
-func NewLogging() mux.MiddlewareFunc {
+type Logger interface {
+	Info(msg string, keysAndValues ...interface{})
+	Error(msg string, keysAndValues ...interface{})
+}
+
+func NewLogging(logger Logger) mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return &loggingMiddleware{
-			next: next,
-			now:  time.Now,
+			next:   next,
+			now:    time.Now,
+			logger: logger,
 		}
 	}
 }
@@ -21,8 +25,9 @@ func NewLogging() mux.MiddlewareFunc {
 var _ http.Handler = &loggingMiddleware{}
 
 type loggingMiddleware struct {
-	next http.Handler
-	now  func() time.Time
+	next   http.Handler
+	now    func() time.Time
+	logger Logger
 }
 
 type responseWriter struct {
@@ -43,9 +48,6 @@ func (rw *responseWriter) Write(b []byte) (int, error) {
 }
 
 func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	logger := ctxlogger.GetLogger(ctx)
-
 	customWriter := &responseWriter{ResponseWriter: w}
 
 	startTime := l.now()
@@ -54,8 +56,5 @@ func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	latency := endTime.Sub(startTime)
 
-	logger.With(
-		"status", customWriter.statusCode,
-		"latency", latency.Milliseconds(),
-	).Info("finished call")
+	l.logger.Info("finished call", "status", customWriter.statusCode, "latency", latency.Milliseconds())
 }

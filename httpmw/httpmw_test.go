@@ -9,7 +9,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/Azure/aks-middleware/ctxlogger"
 	"github.com/gorilla/mux"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -44,7 +43,9 @@ var _ = Describe("Httpmw", func() {
 
 	Describe("LoggingMiddleware", func() {
 		It("should log and return OK status", func() {
-			router.Use(NewLogging())
+			buf := new(bytes.Buffer)
+			slogLogger := slog.New(slog.NewJSONHandler(buf, nil))
+			router.Use(NewLogging(slogLogger))
 
 			router.HandleFunc("/", func(w http.ResponseWriter, e *http.Request) {
 				time.Sleep(10 * time.Millisecond)
@@ -53,10 +54,8 @@ var _ = Describe("Httpmw", func() {
 
 			rw := httptest.NewRecorder()
 			req := httptest.NewRequest("GET", "/", nil)
-			var buf bytes.Buffer
 
-			// attaching logger to ctx
-			router.ServeHTTP(rw, req.WithContext(ctxlogger.WithLogger(req.Context(), slog.New(slog.NewJSONHandler(&buf, nil)))))
+			router.ServeHTTP(rw, req)
 
 			Expect(buf.String()).To(ContainSubstring("finished call"))
 			Expect(rw.Result().StatusCode).To(Equal(200))
@@ -66,7 +65,7 @@ var _ = Describe("Httpmw", func() {
 })
 
 // Custom panic handler for testing
-func customPanicHandler(logger *slog.Logger, w http.ResponseWriter, r *http.Request, err interface{}) {
+func customPanicHandler(logger Logger, w http.ResponseWriter, r *http.Request, err interface{}) {
 	logger.Info(fmt.Sprintf("Custom panic occurred: %v", err))
 	// Additional custom handling logic here
 	http.Error(w, "Internal Server Error", http.StatusInternalServerError)
