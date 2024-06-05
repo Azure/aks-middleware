@@ -3,7 +3,6 @@ package policy
 import (
 	log "log/slog"
 	"net/http"
-	"net/url"
 	"time"
 
 	"github.com/Azure/aks-middleware/logging"
@@ -23,23 +22,6 @@ func NewLoggingPolicy(logger log.Logger) *LoggingPolicy {
 func (p *LoggingPolicy) Do(req *azcorePolicy.Request) (*http.Response, error) {
 	startTime := time.Now()
 	resp, err := req.Next()
-	requestURL := req.Raw().URL.String()
-	parsedURL, parseErr := url.Parse(requestURL)
-	if parseErr != nil {
-		p.logger.With(
-			"code", "na",
-			"component", "client",
-			"time_ms", "na",
-			"method", "na",
-			"service", "na",
-			"url", req.Raw().URL.String(),
-			"error", parseErr.Error(),
-		).Error("error parsing request URL")
-	} else {
-		// Example URLs: "https://management.azure.com/subscriptions/{sub_id}/resourcegroups?api-version={version}"
-		// https://management.azure.com/subscriptions/{sub_id}/resourceGroups/{rg_name}/providers/Microsoft.Storage/storageAccounts/{sa_name}?api-version={version}
-		requestURL = trimURL(*parsedURL)
-	}
 
 	logging.LogRequest(logging.LogRequestParams{
 		Logger:    &p.logger,
@@ -47,7 +29,6 @@ func (p *LoggingPolicy) Do(req *azcorePolicy.Request) (*http.Response, error) {
 		Request:   req.Raw(),
 		Response:  resp,
 		Error:     err,
-		URL:       requestURL,
 	})
 	return resp, err
 }
@@ -69,37 +50,11 @@ func GetDefaultArmClientOptions(logger *log.Logger) *armPolicy.ClientOptions {
 	armClientOptions := new(armPolicy.ClientOptions)
 	armClientOptions.ClientOptions = *clientOptions
 
-	policyLogger := logger.With(
-		"source", "ApiAutoLog",
-		"method_type", "unary",
-		"protocol", "REST",
-	)
-	loggingPolicy := NewLoggingPolicy(*policyLogger)
+	loggingPolicy := NewLoggingPolicy(*logger)
 
 	armClientOptions.PerCallPolicies = append(armClientOptions.PerCallPolicies, loggingPolicy)
 
 	return armClientOptions
-}
-
-func trimURL(parsedURL url.URL) string {
-
-	query := parsedURL.Query()
-	apiVersion := query.Get("api-version")
-
-	// Remove all other query parameters
-	for key := range query {
-		if key != "api-version" {
-			query.Del(key)
-		}
-	}
-
-	// Set the api-version query parameter
-	query.Set("api-version", apiVersion)
-
-	// Encode the query parameters and set them in the parsed URL
-	parsedURL.RawQuery = query.Encode()
-
-	return parsedURL.String()
 }
 
 // Based off of gRPC standard here: https://chromium.googlesource.com/external/github.com/grpc/grpc/+/refs/tags/v1.21.4-pre1/doc/statuscodes.md
