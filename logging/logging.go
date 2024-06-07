@@ -29,7 +29,9 @@ type LogRequestParams struct {
 func getMethodInfo(method string, rawURL string) string {
 	urlParts := strings.Split(rawURL, "?api-version")
 	// malformed url
-	if len(urlParts) < 2 {
+	// check for v1 to ensure we aren't classifying restlogger as malformed
+	slog.Info("urlParts " + urlParts[0])
+	if len(urlParts) < 2 && !strings.Contains(urlParts[0], "v1") {
 		return method + " " + rawURL
 	}
 	parts := strings.Split(urlParts[0], "/")
@@ -39,6 +41,10 @@ func getMethodInfo(method string, rawURL string) string {
 	// to get nested resource type
 	for counter = len(parts) - 1; counter >= 0; counter-- {
 		currToken := strings.ToLower(parts[counter])
+		if strings.ContainsAny(currToken, "?/") {
+			index := strings.IndexAny(currToken, "?/")
+			currToken = currToken[:index]
+		}
 		if resourceTypes[currToken] {
 			resource = currToken
 			break
@@ -47,10 +53,10 @@ func getMethodInfo(method string, rawURL string) string {
 
 	if method == "GET" {
 		// resource name is specified, so it is a READ op
-		if counter != len(parts)-1 {
-			resource = resource + " - READ"
-		} else {
+		if counter == len(parts)-1 {
 			resource = resource + " - LIST"
+		} else {
+			resource = resource + " - READ"
 		}
 	}
 
@@ -59,26 +65,17 @@ func getMethodInfo(method string, rawURL string) string {
 
 	return methodInfo
 }
+
 func trimURL(parsedURL url.URL) string {
-	// Example URLs: "https://management.azure.com/subscriptions/{sub_id}/resourcegroups?api-version={version}"
-	// https://management.azure.com/subscriptions/{sub_id}/resourceGroups/{rg_name}/providers/Microsoft.Storage/storageAccounts/{sa_name}?api-version={version}
-	query := parsedURL.Query()
-	apiVersion := query.Get("api-version")
+	// Extract the `api-version` parameter
+	apiVersion := parsedURL.Query().Get("api-version")
 
-	// Remove all other query parameters
-	for key := range query {
-		if key != "api-version" {
-			query.Del(key)
-		}
+	// Reconstruct the URL with only the `api-version` parameter
+	baseURL := parsedURL.Scheme + "://" + parsedURL.Host + parsedURL.Path
+	if apiVersion != "" {
+		return baseURL + "?api-version=" + apiVersion
 	}
-
-	// Set the api-version query parameter
-	query.Set("api-version", apiVersion)
-
-	// Encode the query parameters and set them in the parsed URL
-	parsedURL.RawQuery = query.Encode()
-
-	return parsedURL.String()
+	return baseURL
 }
 
 func LogRequest(params LogRequestParams) {
@@ -93,25 +90,26 @@ func LogRequest(params LogRequestParams) {
 		method = req.Raw().Method
 		service = req.Raw().Host
 		reqURL = req.Raw().URL.String()
-		parsedURL, parseErr := url.Parse(reqURL)
-		if parseErr != nil {
-			params.Logger.With(
-				"source", "ApiAutoLog",
-				"protocol", "REST",
-				"method_type", "unary",
-				"code", "na",
-				"component", "client",
-				"time_ms", "na",
-				"method", method,
-				"service", service,
-				"url", reqURL,
-				"error", parseErr.Error(),
-			).Error("error parsing request URL")
-		} else {
-			reqURL = trimURL(*parsedURL)
-		}
 	default:
 		return // Unknown request type, do nothing
+	}
+
+	parsedURL, parseErr := url.Parse(reqURL)
+	if parseErr != nil {
+		params.Logger.With(
+			"source", "ApiAutoLog",
+			"protocol", "REST",
+			"method_type", "unary",
+			"code", "na",
+			"component", "client",
+			"time_ms", "na",
+			"method", method,
+			"service", service,
+			"url", reqURL,
+			"error", parseErr.Error(),
+		).Error("error parsing request URL")
+	} else {
+		reqURL = trimURL(*parsedURL)
 	}
 
 	methodInfo := getMethodInfo(method, reqURL)
