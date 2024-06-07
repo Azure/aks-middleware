@@ -72,7 +72,6 @@ logging.LogRequest(logging.LogRequestParams{
     Request:   httpRequest,
     Response:  httpResponse,
     Error:     err,
-    URL:       requestURL
 })
 ```
 
