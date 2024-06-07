@@ -71,12 +71,12 @@ func DefaultClientInterceptors(options ClientInterceptorLogOptions) []grpc.Unary
 
 	apiHandler = apiHandler.WithAttrs(options.Attributes)
 
-	apiAutologger := log.New(apiHandler).With("source", "ApiAutoLog")
+	apiRequestLogger := log.New(apiHandler).With("source", "ApiRequestLog")
 	return []grpc.UnaryClientInterceptor{
 		retry.UnaryClientInterceptor(GetRetryOptions()...),
 		mdforward.UnaryClientInterceptor(),
 		logging.UnaryClientInterceptor(
-			autologger.InterceptorLogger(apiAutologger),
+			autologger.InterceptorLogger(apiRequestLogger),
 			logging.WithLogOnEvents(logging.FinishCall),
 			logging.WithLevels(logging.DefaultServerCodeToLevel),
 			logging.WithFieldsFromContext(autologger.GetFields),
@@ -127,7 +127,7 @@ func DefaultServerInterceptors(options ServerInterceptorLogOptions) []grpc.Unary
 	apiHandler = apiHandler.WithAttrs(options.APIAttributes)
 	ctxHandler = ctxHandler.WithAttrs(options.CtxAttributes)
 
-	apiAutologger := log.New(apiHandler).With("source", "ApiAutoLog")
+	apiRequestLogger := log.New(apiHandler).With("source", "ApiRequestLog")
 	appCtxlogger := log.New(ctxHandler).With("source", "CtxLog")
 	validator, err := protovalidate.New()
 	if err != nil {
@@ -138,7 +138,7 @@ func DefaultServerInterceptors(options ServerInterceptorLogOptions) []grpc.Unary
 		requestid.UnaryServerInterceptor(),
 		ctxlogger.UnaryServerInterceptor(appCtxlogger, nil),
 		logging.UnaryServerInterceptor(
-			autologger.InterceptorLogger(apiAutologger),
+			autologger.InterceptorLogger(apiRequestLogger),
 			logging.WithLogOnEvents(logging.FinishCall),
 			logging.WithFieldsFromContext(autologger.GetFields),
 		),

@@ -97,7 +97,7 @@ func LogRequest(params LogRequestParams) {
 	parsedURL, parseErr := url.Parse(reqURL)
 	if parseErr != nil {
 		params.Logger.With(
-			"source", "ApiAutoLog",
+			"source", "ApiRequestLog",
 			"protocol", "REST",
 			"method_type", "unary",
 			"code", "na",
@@ -115,7 +115,7 @@ func LogRequest(params LogRequestParams) {
 	methodInfo := getMethodInfo(method, reqURL)
 	latency := time.Since(params.StartTime).Milliseconds()
 	logEntry := params.Logger.With(
-		"source", "ApiAutoLog",
+		"source", "ApiRequestLog",
 		"protocol", "REST",
 		"method_type", "unary",
 		"code", params.Response.StatusCode,
