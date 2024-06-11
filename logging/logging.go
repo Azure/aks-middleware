@@ -11,10 +11,11 @@ import (
 )
 
 var resourceTypes = map[string]bool{
-	"resourcegroups":   true,
-	"storageaccounts":  true,
-	"operationresults": true,
-	"asyncoperations":  true,
+	"resourcegroups":        true,
+	"storageaccounts":       true,
+	"operationresults":      true,
+	"asyncoperations":       true,
+	"checknameavailability": true,
 }
 
 type LogRequestParams struct {
@@ -30,7 +31,6 @@ func getMethodInfo(method string, rawURL string) string {
 	urlParts := strings.Split(rawURL, "?api-version")
 	// malformed url
 	// check for v1 to ensure we aren't classifying restlogger as malformed
-	slog.Info("urlParts " + urlParts[0])
 	if len(urlParts) < 2 && !strings.Contains(urlParts[0], "v1") {
 		return method + " " + rawURL
 	}
@@ -118,7 +118,6 @@ func LogRequest(params LogRequestParams) {
 		"source", "ApiRequestLog",
 		"protocol", "REST",
 		"method_type", "unary",
-		"code", params.Response.StatusCode,
 		"component", "client",
 		"time_ms", latency,
 		"method", methodInfo,
@@ -126,11 +125,11 @@ func LogRequest(params LogRequestParams) {
 		"url", reqURL,
 	)
 
-	if params.Error != nil {
-		logEntry.With("error", params.Error.Error()).Error("finished call")
+	if params.Error != nil || params.Response == nil {
+		logEntry.With("error", params.Error.Error(), "code", "na").Error("finished call")
 	} else if 200 <= params.Response.StatusCode && params.Response.StatusCode < 300 {
-		logEntry.With("error", "na").Info("finished call")
+		logEntry.With("error", "na", "code", params.Response.StatusCode).Info("finished call")
 	} else {
-		logEntry.With("error", params.Response.Status).Error("finished call")
+		logEntry.With("error", params.Response.Status, "code", params.Response.StatusCode).Error("finished call")
 	}
 }
