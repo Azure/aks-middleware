@@ -51,10 +51,20 @@ func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	customWriter := &responseWriter{ResponseWriter: w}
 
 	startTime := l.now()
+	l.LogRequestStart(r)
 	l.next.ServeHTTP(customWriter, r)
 	endTime := l.now()
 
 	latency := endTime.Sub(startTime)
+	l.LogRequestEnd(r, customWriter.statusCode, latency)
 
 	l.logger.Info("finished call", "status", customWriter.statusCode, "latency", latency.Milliseconds())
+}
+
+func (l *loggingMiddleware) LogRequestStart(r *http.Request) {
+	l.logger.Info("request started", "method", r.Method, "url", r.URL.String())
+}
+
+func (l *loggingMiddleware) LogRequestEnd(r *http.Request, statusCode int, duration time.Duration) {
+	l.logger.Info("request ended", "method", r.Method, "url", r.URL.String(), "status", statusCode, "duration", duration.Milliseconds())
 }
