@@ -73,7 +73,7 @@ func GetRecoveryOpts() []recovery.Option {
 		}
 
 		// format the error message with the file and line number
-		return status.Errorf(codes.Unknown, "panic_message: %v, file: %s, line: %s, url: %s", p, file, linenum, url)
+		return status.Errorf(codes.Internal, "panic_message: %v, file: %s, line: %s, url: %s", p, file, linenum, url)
 	}
 	opts := []recovery.Option{
 		recovery.WithRecoveryHandler(getFileAndLineNum),
