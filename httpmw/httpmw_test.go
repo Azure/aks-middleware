@@ -58,6 +58,13 @@ var _ = Describe("Httpmw", func() {
 			router.ServeHTTP(rw, req)
 
 			Expect(buf.String()).To(ContainSubstring("finished call"))
+			Expect(buf.String()).To(ContainSubstring(`"source":"ApiRequestLog"`))
+			Expect(buf.String()).To(ContainSubstring(`"protocol":"HTTP"`))
+			Expect(buf.String()).To(ContainSubstring(`"method_type":"unary"`))
+			Expect(buf.String()).To(ContainSubstring(`"component":"client"`))
+			Expect(buf.String()).To(ContainSubstring(`"time_ms":`))
+			Expect(buf.String()).To(ContainSubstring(`"service":"`))
+			Expect(buf.String()).To(ContainSubstring(`"url":"`))
 			Expect(rw.Result().StatusCode).To(Equal(200))
 
 		})

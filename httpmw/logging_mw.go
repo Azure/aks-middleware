@@ -58,13 +58,13 @@ func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	latency := endTime.Sub(startTime)
 	l.LogRequestEnd(r, customWriter.statusCode, latency)
 
-	l.logger.Info("finished call", "status", customWriter.statusCode, "latency", latency.Milliseconds())
+	l.logger.Info("finished call", "source", "ApiRequestLog", "protocol", "HTTP", "method_type", "unary", "component", "client", "time_ms", latency.Milliseconds(), "method", r.Method, "service", r.Host, "url", r.URL.String(), "code", customWriter.statusCode)
 }
 
 func (l *loggingMiddleware) LogRequestStart(r *http.Request) {
-	l.logger.Info("request started", "method", r.Method, "url", r.URL.String())
+	l.logger.Info("RequestStart", "source", "ApiRequestLog", "protocol", "HTTP", "method_type", "unary", "component", "client", "method", r.Method, "service", r.Host, "url", r.URL.String())
 }
 
 func (l *loggingMiddleware) LogRequestEnd(r *http.Request, statusCode int, duration time.Duration) {
-	l.logger.Info("request ended", "method", r.Method, "url", r.URL.String(), "status", statusCode, "duration", duration.Milliseconds())
+	l.logger.Info("RequestEnd", "source", "ApiRequestLog", "protocol", "HTTP", "method_type", "unary", "component", "client", "method", r.Method, "service", r.Host, "url", r.URL.String(), "code", statusCode, "time_ms", duration.Milliseconds())
 }
