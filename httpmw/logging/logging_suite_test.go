@@ -1,4 +1,4 @@
-package httpmw
+package logging
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestHttpmw(t *testing.T) {
+func TestLogging(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "HttpMW Suite")
+	RunSpecs(t, "Logging Suite")
 }

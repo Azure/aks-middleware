@@ -1,4 +1,4 @@
-package httpmw
+package logging
 
 import (
 	"net/http"
@@ -12,6 +12,8 @@ type Logger interface {
 	Error(msg string, keysAndValues ...interface{})
 }
 
+// more info about gorilla/mux mw here:
+// https://github.com/gorilla/mux/tree/db9d1d0073d27a0a2d9a8c1bc52aa0af4374d265?tab=readme-ov-file#middleware
 func NewLogging(logger Logger) mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return &loggingMiddleware{
@@ -35,16 +37,16 @@ type responseWriter struct {
 	statusCode int
 }
 
-func (rw *responseWriter) WriteHeader(code int) {
-	rw.statusCode = code
-	rw.ResponseWriter.WriteHeader(code)
+func (w *responseWriter) WriteHeader(code int) {
+	w.statusCode = code
+	w.ResponseWriter.WriteHeader(code)
 }
 
-func (rw *responseWriter) Write(b []byte) (int, error) {
-	if rw.statusCode == 0 {
-		rw.statusCode = http.StatusOK
+func (w *responseWriter) Write(b []byte) (int, error) {
+	if w.statusCode == 0 {
+		w.statusCode = http.StatusOK
 	}
-	return rw.ResponseWriter.Write(b)
+	return w.ResponseWriter.Write(b)
 }
 
 func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -56,15 +58,14 @@ func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	endTime := l.now()
 
 	latency := endTime.Sub(startTime)
-	l.LogRequestEnd(r, customWriter.statusCode, latency)
-
-	l.logger.Info("finished call", "source", "ApiRequestLog", "protocol", "HTTP", "method_type", "unary", "component", "client", "time_ms", latency.Milliseconds(), "method", r.Method, "service", r.Host, "url", r.URL.String(), "code", customWriter.statusCode)
+	l.LogRequestEnd(r, "RequestEnd", customWriter.statusCode, latency)
+	l.LogRequestEnd(r, "finished call", customWriter.statusCode, latency)
 }
 
 func (l *loggingMiddleware) LogRequestStart(r *http.Request) {
 	l.logger.Info("RequestStart", "source", "ApiRequestLog", "protocol", "HTTP", "method_type", "unary", "component", "client", "method", r.Method, "service", r.Host, "url", r.URL.String())
 }
 
-func (l *loggingMiddleware) LogRequestEnd(r *http.Request, statusCode int, duration time.Duration) {
-	l.logger.Info("RequestEnd", "source", "ApiRequestLog", "protocol", "HTTP", "method_type", "unary", "component", "client", "method", r.Method, "service", r.Host, "url", r.URL.String(), "code", statusCode, "time_ms", duration.Milliseconds())
+func (l *loggingMiddleware) LogRequestEnd(r *http.Request, msg string, statusCode int, duration time.Duration) {
+	l.logger.Info(msg, "source", "ApiRequestLog", "protocol", "HTTP", "method_type", "unary", "component", "client", "method", r.Method, "service", r.Host, "url", r.URL.String(), "code", statusCode, "time_ms", duration.Milliseconds())
 }

@@ -1,14 +1,13 @@
-package httpmw
+package recovery
 
 import (
-	"bytes"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"time"
 
+	"github.com/Azure/aks-middleware/httpmw/logging"
 	"github.com/gorilla/mux"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -39,17 +38,12 @@ var _ = Describe("Httpmw", func() {
 			Expect(rw.Body.String()).To(ContainSubstring("Internal Server Error"))
 			Expect(rw.Result().StatusCode).To(Equal(500))
 		})
-	})
 
-	Describe("LoggingMiddleware", func() {
-		It("should log and return OK status", func() {
-			buf := new(bytes.Buffer)
-			slogLogger := slog.New(slog.NewJSONHandler(buf, nil))
-			router.Use(NewLogging(slogLogger))
-
+		It("should use default handler if custom handler is not passed", func() {
+			logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+			router.Use(NewPanicHandling(logger, nil))
 			router.HandleFunc("/", func(w http.ResponseWriter, e *http.Request) {
-				time.Sleep(10 * time.Millisecond)
-				w.WriteHeader(http.StatusOK)
+				panic("oops")
 			})
 
 			rw := httptest.NewRecorder()
@@ -57,22 +51,14 @@ var _ = Describe("Httpmw", func() {
 
 			router.ServeHTTP(rw, req)
 
-			Expect(buf.String()).To(ContainSubstring("finished call"))
-			Expect(buf.String()).To(ContainSubstring(`"source":"ApiRequestLog"`))
-			Expect(buf.String()).To(ContainSubstring(`"protocol":"HTTP"`))
-			Expect(buf.String()).To(ContainSubstring(`"method_type":"unary"`))
-			Expect(buf.String()).To(ContainSubstring(`"component":"client"`))
-			Expect(buf.String()).To(ContainSubstring(`"time_ms":`))
-			Expect(buf.String()).To(ContainSubstring(`"service":"`))
-			Expect(buf.String()).To(ContainSubstring(`"url":"`))
-			Expect(rw.Result().StatusCode).To(Equal(200))
-
+			Expect(rw.Body.String()).To(ContainSubstring("Internal Server Error"))
+			Expect(rw.Result().StatusCode).To(Equal(500))
 		})
 	})
 })
 
 // Custom panic handler for testing
-func customPanicHandler(logger Logger, w http.ResponseWriter, r *http.Request, err interface{}) {
+func customPanicHandler(logger logging.Logger, w http.ResponseWriter, r *http.Request, err interface{}) {
 	logger.Info(fmt.Sprintf("Custom panic occurred: %v", err))
 	// Additional custom handling logic here
 	http.Error(w, "Internal Server Error", http.StatusInternalServerError)
