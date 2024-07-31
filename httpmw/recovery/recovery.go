@@ -7,6 +7,8 @@ import (
 	"github.com/gorilla/mux"
 )
 
+// comment for testing
+
 type PanicHandlerFunc func(logger logging.Logger, w http.ResponseWriter, r *http.Request, err interface{})
 
 func defaultPanicHandler(logger logging.Logger, w http.ResponseWriter, r *http.Request, err interface{}) {
