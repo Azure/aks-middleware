@@ -7,7 +7,6 @@ import (
 	"net/http/httptest"
 	"os"
 
-	"github.com/Azure/aks-middleware/httpmw/logging"
 	"github.com/gorilla/mux"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -58,7 +57,7 @@ var _ = Describe("Httpmw", func() {
 })
 
 // Custom panic handler for testing
-func customPanicHandler(logger logging.Logger, w http.ResponseWriter, r *http.Request, err interface{}) {
+func customPanicHandler(logger slog.Logger, w http.ResponseWriter, r *http.Request, err interface{}) {
 	logger.Info(fmt.Sprintf("Custom panic occurred: %v", err))
 	// Additional custom handling logic here
 	http.Error(w, "Bad Request", http.StatusBadRequest)

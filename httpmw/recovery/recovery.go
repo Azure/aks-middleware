@@ -1,27 +1,27 @@
 package recovery
 
 import (
+	"log/slog"
 	"net/http"
 
-	"github.com/Azure/aks-middleware/httpmw/logging"
 	"github.com/gorilla/mux"
 )
 
-type PanicHandlerFunc func(logger logging.Logger, w http.ResponseWriter, r *http.Request, err interface{})
+type PanicHandlerFunc func(logger slog.Logger, w http.ResponseWriter, r *http.Request, err interface{})
 
-func defaultPanicHandler(logger logging.Logger, w http.ResponseWriter, r *http.Request, err interface{}) {
+func defaultPanicHandler(logger slog.Logger, w http.ResponseWriter, r *http.Request, err interface{}) {
 	logger.Error("Panic occurred", "error", err)
 	http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 }
 
-func NewPanicHandling(logger logging.Logger, panicHandler PanicHandlerFunc) mux.MiddlewareFunc {
+func NewPanicHandling(logger *slog.Logger, panicHandler PanicHandlerFunc) mux.MiddlewareFunc {
 	if panicHandler == nil {
 		panicHandler = defaultPanicHandler
 	}
 	return func(next http.Handler) http.Handler {
 		return &panicHandlingMiddleware{
 			next:         next,
-			logger:       logger,
+			logger:       *logger,
 			panicHandler: panicHandler,
 		}
 	}
@@ -29,7 +29,7 @@ func NewPanicHandling(logger logging.Logger, panicHandler PanicHandlerFunc) mux.
 
 type panicHandlingMiddleware struct {
 	next         http.Handler
-	logger       logging.Logger
+	logger       slog.Logger
 	panicHandler PanicHandlerFunc
 }
 

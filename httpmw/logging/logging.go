@@ -1,24 +1,23 @@
 package logging
 
 import (
+	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/gorilla/mux"
 )
 
-type Logger interface {
-	Info(msg string, keysAndValues ...interface{})
-	Error(msg string, keysAndValues ...interface{})
-}
+// TODO (Tom): Add a logger wrapper in its own package
+// https://medium.com/@ansujain/building-a-logger-wrapper-in-go-with-support-for-multiple-logging-libraries-48092b826bee
 
 // more info about http handler here: https://pkg.go.dev/net/http#Handler
-func NewLogging(logger Logger) mux.MiddlewareFunc {
+func NewLogging(logger *slog.Logger) mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return &loggingMiddleware{
 			next:   next,
 			now:    time.Now,
-			logger: logger,
+			logger: *logger,
 		}
 	}
 }
@@ -29,7 +28,7 @@ var _ http.Handler = &loggingMiddleware{}
 type loggingMiddleware struct {
 	next   http.Handler
 	now    func() time.Time
-	logger Logger
+	logger slog.Logger
 }
 
 type responseWriter struct {
