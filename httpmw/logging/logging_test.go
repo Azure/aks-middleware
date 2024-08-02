@@ -27,15 +27,15 @@ var _ = Describe("Httpmw", func() {
 			slogLogger := slog.New(slog.NewJSONHandler(buf, nil))
 			router.Use(NewLogging(slogLogger))
 
-			router.HandleFunc("/", func(w http.ResponseWriter, e *http.Request) {
+			router.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
 				time.Sleep(10 * time.Millisecond)
 				w.WriteHeader(http.StatusOK)
 			})
 
-			rw := httptest.NewRecorder()
+			w := httptest.NewRecorder()
 			req := httptest.NewRequest("GET", "/", nil)
 
-			router.ServeHTTP(rw, req)
+			router.ServeHTTP(w, req)
 
 			Expect(buf.String()).To(ContainSubstring("finished call"))
 			Expect(buf.String()).To(ContainSubstring(`"source":"ApiRequestLog"`))
@@ -45,7 +45,7 @@ var _ = Describe("Httpmw", func() {
 			Expect(buf.String()).To(ContainSubstring(`"time_ms":`))
 			Expect(buf.String()).To(ContainSubstring(`"service":"`))
 			Expect(buf.String()).To(ContainSubstring(`"url":"`))
-			Expect(rw.Result().StatusCode).To(Equal(200))
+			Expect(w.Result().StatusCode).To(Equal(200))
 
 		})
 	})

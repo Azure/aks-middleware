@@ -26,33 +26,33 @@ var _ = Describe("Httpmw", func() {
 		It("should handle panic and return Internal Server Error", func() {
 			logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 			router.Use(NewPanicHandling(logger, customPanicHandler))
-			router.HandleFunc("/", func(w http.ResponseWriter, e *http.Request) {
+			router.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
 				panic("oops")
 			})
 
-			rw := httptest.NewRecorder()
+			w := httptest.NewRecorder()
 			req := httptest.NewRequest("GET", "/", nil)
 
-			router.ServeHTTP(rw, req)
+			router.ServeHTTP(w, req)
 
-			Expect(rw.Body.String()).To(ContainSubstring("Internal Server Error"))
-			Expect(rw.Result().StatusCode).To(Equal(500))
+			Expect(w.Body.String()).To(ContainSubstring("Bad Request"))
+			Expect(w.Result().StatusCode).To(Equal(400))
 		})
 
 		It("should use default handler if custom handler is not passed", func() {
 			logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 			router.Use(NewPanicHandling(logger, nil))
-			router.HandleFunc("/", func(w http.ResponseWriter, e *http.Request) {
+			router.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
 				panic("oops")
 			})
 
-			rw := httptest.NewRecorder()
+			w := httptest.NewRecorder()
 			req := httptest.NewRequest("GET", "/", nil)
 
-			router.ServeHTTP(rw, req)
+			router.ServeHTTP(w, req)
 
-			Expect(rw.Body.String()).To(ContainSubstring("Internal Server Error"))
-			Expect(rw.Result().StatusCode).To(Equal(500))
+			Expect(w.Body.String()).To(ContainSubstring("Internal Server Error"))
+			Expect(w.Result().StatusCode).To(Equal(500))
 		})
 	})
 })
@@ -61,5 +61,5 @@ var _ = Describe("Httpmw", func() {
 func customPanicHandler(logger logging.Logger, w http.ResponseWriter, r *http.Request, err interface{}) {
 	logger.Info(fmt.Sprintf("Custom panic occurred: %v", err))
 	// Additional custom handling logic here
-	http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+	http.Error(w, "Bad Request", http.StatusBadRequest)
 }

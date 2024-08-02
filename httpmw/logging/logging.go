@@ -12,8 +12,7 @@ type Logger interface {
 	Error(msg string, keysAndValues ...interface{})
 }
 
-// more info about gorilla/mux mw here:
-// https://github.com/gorilla/mux/tree/db9d1d0073d27a0a2d9a8c1bc52aa0af4374d265?tab=readme-ov-file#middleware
+// more info about http handler here: https://pkg.go.dev/net/http#Handler
 func NewLogging(logger Logger) mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return &loggingMiddleware{
@@ -24,6 +23,7 @@ func NewLogging(logger Logger) mux.MiddlewareFunc {
 	}
 }
 
+// enforcing that loggingMiddleware implements the http.Handler interface to ensure safety at compile time
 var _ http.Handler = &loggingMiddleware{}
 
 type loggingMiddleware struct {
@@ -63,9 +63,12 @@ func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (l *loggingMiddleware) LogRequestStart(r *http.Request) {
-	l.logger.Info("RequestStart", "source", "ApiRequestLog", "protocol", "HTTP", "method_type", "unary", "component", "client", "method", r.Method, "service", r.Host, "url", r.URL.String())
+	l.logger.Info("RequestStart", "source", "ApiRequestLog", "protocol", "HTTP", "method_type", "unary",
+		"component", "client", "method", r.Method, "service", r.Host, "url", r.URL.String())
 }
 
 func (l *loggingMiddleware) LogRequestEnd(r *http.Request, msg string, statusCode int, duration time.Duration) {
-	l.logger.Info(msg, "source", "ApiRequestLog", "protocol", "HTTP", "method_type", "unary", "component", "client", "method", r.Method, "service", r.Host, "url", r.URL.String(), "code", statusCode, "time_ms", duration.Milliseconds())
+	l.logger.Info(msg, "source", "ApiRequestLog", "protocol", "HTTP", "method_type", "unary",
+		"component", "client", "method", r.Method, "service", r.Host, "url", r.URL.String(),
+		"code", statusCode, "time_ms", duration.Milliseconds())
 }
