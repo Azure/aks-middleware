@@ -67,7 +67,7 @@ func (l *loggingMiddleware) LogRequestStart(r *http.Request) {
 }
 
 func (l *loggingMiddleware) LogRequestEnd(r *http.Request, msg string, statusCode int, duration time.Duration) {
-	l.logger.Info(msg, "source", "ApiRequestLog", "protocol", "HTTP", "method_type", "unary",
-		"component", "client", "method", r.Method, "service", r.Host, "url", r.URL.String(),
-		"code", statusCode, "time_ms", duration.Milliseconds())
+	l.logger.Info(msg, "source", "ApiRequestLog", "protocol", "HTTP", "method_type",
+		"unary", "component", "client", "method", r.Method, "service", r.Host,
+		"url", r.URL.String(), "code", statusCode, "time_ms", duration.Milliseconds())
 }
