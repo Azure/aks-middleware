@@ -1,10 +1,10 @@
 package logging
 
 import (
-	"log/slog"
 	"net/http"
 	"time"
 
+	"github.com/Azure/aks-middleware/unifiedlogger"
 	"github.com/gorilla/mux"
 )
 
@@ -12,7 +12,7 @@ import (
 // https://medium.com/@ansujain/building-a-logger-wrapper-in-go-with-support-for-multiple-logging-libraries-48092b826bee
 
 // more info about http handler here: https://pkg.go.dev/net/http#Handler
-func NewLogging(logger *slog.Logger) mux.MiddlewareFunc {
+func NewLogging(logger *unifiedlogger.LoggerWrapper) mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return &loggingMiddleware{
 			next:   next,
@@ -28,7 +28,7 @@ var _ http.Handler = &loggingMiddleware{}
 type loggingMiddleware struct {
 	next   http.Handler
 	now    func() time.Time
-	logger slog.Logger
+	logger unifiedlogger.LoggerWrapper
 }
 
 type responseWriter struct {
@@ -62,12 +62,27 @@ func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (l *loggingMiddleware) LogRequestStart(r *http.Request) {
-	l.logger.Info("RequestStart", "source", "ApiRequestLog", "protocol", "HTTP", "method_type", "unary",
-		"component", "client", "method", r.Method, "service", r.Host, "url", r.URL.String())
+	l.logger.Info("RequestStart", map[string]interface{}{
+		"source":      "ApiRequestLog",
+		"protocol":    "HTTP",
+		"method_type": "unary",
+		"component":   "client",
+		"method":      r.Method,
+		"service":     r.Host,
+		"url":         r.URL.String(),
+	})
 }
 
 func (l *loggingMiddleware) LogRequestEnd(r *http.Request, msg string, statusCode int, duration time.Duration) {
-	l.logger.Info(msg, "source", "ApiRequestLog", "protocol", "HTTP", "method_type",
-		"unary", "component", "client", "method", r.Method, "service", r.Host,
-		"url", r.URL.String(), "code", statusCode, "time_ms", duration.Milliseconds())
+	l.logger.Info(msg, map[string]interface{}{
+		"source":      "ApiRequestLog",
+		"protocol":    "HTTP",
+		"method_type": "unary",
+		"component":   "client",
+		"method":      r.Method,
+		"service":     r.Host,
+		"url":         r.URL.String(),
+		"code":        statusCode,
+		"time_ms":     duration.Milliseconds(),
+	})
 }

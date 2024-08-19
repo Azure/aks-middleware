@@ -1,21 +1,21 @@
 package policy
 
 import (
-	log "log/slog"
 	"net/http"
 	"time"
 
 	"github.com/Azure/aks-middleware/logging"
+	"github.com/Azure/aks-middleware/unifiedlogger"
 	armPolicy "github.com/Azure/azure-sdk-for-go/sdk/azcore/arm/policy"
 	azcorePolicy "github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"google.golang.org/grpc/codes"
 )
 
 type LoggingPolicy struct {
-	logger log.Logger
+	logger unifiedlogger.LoggerWrapper
 }
 
-func NewLoggingPolicy(logger log.Logger) *LoggingPolicy {
+func NewLoggingPolicy(logger unifiedlogger.LoggerWrapper) *LoggingPolicy {
 	return &LoggingPolicy{logger: logger}
 }
 
@@ -37,7 +37,7 @@ func (p *LoggingPolicy) Clone() azcorePolicy.Policy {
 	return &LoggingPolicy{logger: p.logger}
 }
 
-func GetDefaultArmClientOptions(logger *log.Logger) *armPolicy.ClientOptions {
+func GetDefaultArmClientOptions(logger *unifiedlogger.LoggerWrapper) *armPolicy.ClientOptions {
 	logOptions := new(azcorePolicy.LogOptions)
 
 	retryOptions := new(azcorePolicy.RetryOptions)

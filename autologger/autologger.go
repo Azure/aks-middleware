@@ -7,39 +7,30 @@ import (
 	"context"
 	"fmt"
 
-	log "log/slog"
-
 	"github.com/Azure/aks-middleware/requestid"
+	"github.com/Azure/aks-middleware/unifiedlogger"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 )
 
-func InterceptorLogger(logger *log.Logger) logging.Logger {
+func InterceptorLogger(logger *unifiedlogger.LoggerWrapper) logging.Logger {
 	return logging.LoggerFunc(func(ctx context.Context, lvl logging.Level, msg string, fields ...any) {
-		// fmt.Println("ctx: ", ctx)
-		// fmt.Printf("fields: %v\n", fields)
 		f := make(map[string]any, len(fields)/2)
-		l := logger
 		i := logging.Fields(fields).Iterator()
 		for i.Next() {
 			k, v := i.At()
 			f[k] = v
-			l = l.With(k, v)
-			// fmt.Printf("k %v, v %v\n", k, v)
 		}
-
-		// fmt.Println(lvl, msg)
-		// l.Info("blah")
 
 		switch lvl {
 		case logging.LevelDebug:
-			l.Debug(msg)
+			logger.Debug(msg, f)
 		case logging.LevelInfo:
-			l.Info(msg)
+			logger.Info(msg, f)
 		case logging.LevelWarn:
-			l.Warn(msg)
+			logger.Warn(msg, f)
 		case logging.LevelError:
-			l.Error(msg)
+			logger.Error(msg, f)
 		default:
 			panic(fmt.Sprintf("unknown level %v", lvl))
 		}

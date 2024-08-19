@@ -1,16 +1,16 @@
 package restlogger
 
 import (
-	log "log/slog"
 	"net/http"
 	"time"
 
 	"github.com/Azure/aks-middleware/logging"
+	"github.com/Azure/aks-middleware/unifiedlogger"
 )
 
 type LoggingRoundTripper struct {
 	Proxied http.RoundTripper
-	Logger  *log.Logger
+	Logger  *unifiedlogger.LoggerWrapper
 }
 
 func (lrt *LoggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -26,7 +26,7 @@ func (lrt *LoggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, er
 	return resp, err
 }
 
-func NewLoggingClient(logger *log.Logger) *http.Client {
+func NewLoggingClient(logger *unifiedlogger.LoggerWrapper) *http.Client {
 	return &http.Client{
 		Transport: &LoggingRoundTripper{
 			Proxied: http.DefaultTransport,

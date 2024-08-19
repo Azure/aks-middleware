@@ -1,13 +1,13 @@
 package logging
 
 import (
-	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
 	azcorePolicy "github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
+	"github.com/Azure/aks-middleware/unifiedlogger"
 )
 
 var resourceTypes = map[string]bool{
@@ -19,7 +19,7 @@ var resourceTypes = map[string]bool{
 }
 
 type LogRequestParams struct {
-	Logger    *slog.Logger
+	Logger    *unifiedlogger.LoggerWrapper
 	StartTime time.Time
 	Request   interface{}
 	Response  *http.Response
@@ -96,40 +96,46 @@ func LogRequest(params LogRequestParams) {
 
 	parsedURL, parseErr := url.Parse(reqURL)
 	if parseErr != nil {
-		params.Logger.With(
-			"source", "ApiRequestLog",
-			"protocol", "REST",
-			"method_type", "unary",
-			"code", "na",
-			"component", "client",
-			"time_ms", "na",
-			"method", method,
-			"service", service,
-			"url", reqURL,
-			"error", parseErr.Error(),
-		).Error("error parsing request URL")
+		params.Logger.Error("error parsing request URL", map[string]interface{}{
+			"source":     "ApiRequestLog",
+			"protocol":   "REST",
+			"method_type": "unary",
+			"code":       "na",
+			"component":  "client",
+			"time_ms":    "na",
+			"method":     method,
+			"service":    service,
+			"url":        reqURL,
+			"error":      parseErr.Error(),
+		})
 	} else {
 		reqURL = trimURL(*parsedURL)
 	}
 
 	methodInfo := getMethodInfo(method, reqURL)
 	latency := time.Since(params.StartTime).Milliseconds()
-	logEntry := params.Logger.With(
-		"source", "ApiRequestLog",
-		"protocol", "REST",
-		"method_type", "unary",
-		"component", "client",
-		"time_ms", latency,
-		"method", methodInfo,
-		"service", service,
-		"url", reqURL,
-	)
+	logEntry := map[string]interface{}{
+		"source":     "ApiRequestLog",
+		"protocol":   "REST",
+		"method_type": "unary",
+		"component":  "client",
+		"time_ms":    latency,
+		"method":     methodInfo,
+		"service":    service,
+		"url":        reqURL,
+	}
 
 	if params.Error != nil || params.Response == nil {
-		logEntry.With("error", params.Error.Error(), "code", "na").Error("finished call")
+		logEntry["error"] = params.Error.Error()
+		logEntry["code"] = "na"
+		params.Logger.Error("finished call", logEntry)
 	} else if 200 <= params.Response.StatusCode && params.Response.StatusCode < 300 {
-		logEntry.With("error", "na", "code", params.Response.StatusCode).Info("finished call")
+		logEntry["error"] = "na"
+		logEntry["code"] = params.Response.StatusCode
+		params.Logger.Info("finished call", logEntry)
 	} else {
-		logEntry.With("error", params.Response.Status, "code", params.Response.StatusCode).Error("finished call")
+		logEntry["error"] = params.Response.Status
+		logEntry["code"] = params.Response.StatusCode
+		params.Logger.Error("finished call", logEntry)
 	}
 }

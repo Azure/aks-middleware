@@ -8,8 +8,8 @@ import (
 	"github.com/Azure/aks-middleware/ctxlogger"
 	"github.com/Azure/aks-middleware/mdforward"
 	"github.com/Azure/aks-middleware/requestid"
+	"github.com/Azure/aks-middleware/unifiedlogger"
 
-	log "log/slog"
 	"strings"
 
 	"github.com/bufbuild/protovalidate-go"
@@ -21,20 +21,20 @@ import (
 )
 
 type ClientInterceptorLogOptions struct {
-	Logger     *log.Logger
+	Logger     *unifiedlogger.LoggerWrapper
 	APIOutput  io.Writer
-	Attributes []log.Attr
+	Attributes []unifiedlogger.LoggerWrapper
 }
 
 type ServerInterceptorLogOptions struct {
-	Logger        *log.Logger
+	Logger        *unifiedlogger.LoggerWrapper
 	APIOutput     io.Writer
 	CtxOutput     io.Writer
-	APIAttributes []log.Attr
-	CtxAttributes []log.Attr
+	APIAttributes []unifiedlogger.LoggerWrapper
+	CtxAttributes []unifiedlogger.LoggerWrapper
 }
 
-func GetClientInterceptorLogOptions(logger *log.Logger, attrs []log.Attr) ClientInterceptorLogOptions {
+func GetClientInterceptorLogOptions(logger *unifiedlogger.LoggerWrapper, attrs []unifiedlogger.LoggerWrapper) ClientInterceptorLogOptions {
 	return ClientInterceptorLogOptions{
 		Logger:     logger,
 		APIOutput:  os.Stdout,
@@ -42,36 +42,36 @@ func GetClientInterceptorLogOptions(logger *log.Logger, attrs []log.Attr) Client
 	}
 }
 
-func GetServerInterceptorLogOptions(logger *log.Logger, attrs []log.Attr) ServerInterceptorLogOptions {
+func GetServerInterceptorLogOptions(logger *unifiedlogger.LoggerWrapper, attrs []unifiedlogger.LoggerWrapper) ServerInterceptorLogOptions {
 	return ServerInterceptorLogOptions{
 		Logger:        logger,
 		APIOutput:     os.Stdout,
 		CtxOutput:     os.Stdout,
-		APIAttributes: attrs,
+			APIAttributes: attrs,
 		CtxAttributes: attrs,
 	}
 }
 
 func DefaultClientInterceptors(options ClientInterceptorLogOptions) []grpc.UnaryClientInterceptor {
-	var apiHandler log.Handler
+	var apiHandler unifiedlogger.LoggerWrapper
 
-	apiHandlerOptions := &log.HandlerOptions{
-		ReplaceAttr: func(groups []string, a log.Attr) log.Attr {
+	apiHandlerOptions := &unifiedlogger.LoggerWrapper{
+		ReplaceAttr: func(groups []string, a unifiedlogger.LoggerWrapper) unifiedlogger.LoggerWrapper {
 			a.Key = strings.TrimPrefix(a.Key, "grpc.")
 			a.Key = strings.ReplaceAll(a.Key, ".", "_")
 			return a
 		},
 	}
 
-	if _, ok := options.Logger.Handler().(*log.JSONHandler); ok {
-		apiHandler = log.NewJSONHandler(options.APIOutput, apiHandlerOptions)
+	if _, ok := options.Logger.Handler().(*unifiedlogger.LoggerWrapper); ok {
+		apiHandler = unifiedlogger.NewJSONHandler(options.APIOutput, apiHandlerOptions)
 	} else {
-		apiHandler = log.NewTextHandler(options.APIOutput, apiHandlerOptions)
+		apiHandler = unifiedlogger.NewTextHandler(options.APIOutput, apiHandlerOptions)
 	}
 
 	apiHandler = apiHandler.WithAttrs(options.Attributes)
 
-	apiRequestLogger := log.New(apiHandler).With("source", "ApiRequestLog")
+	apiRequestLogger := unifiedlogger.New(apiHandler).With("source", "ApiRequestLog")
 	return []grpc.UnaryClientInterceptor{
 		retry.UnaryClientInterceptor(GetRetryOptions()...),
 		mdforward.UnaryClientInterceptor(),
@@ -88,23 +88,23 @@ func DefaultServerInterceptors(options ServerInterceptorLogOptions) []grpc.Unary
 	// The first registerred interceptor will be called first.
 	// Need to register requestid first to add request-id.
 	// Then the logger can get the request-id.
-	var apiHandler log.Handler
-	var ctxHandler log.Handler
+	var apiHandler unifiedlogger.LoggerWrapper
+	var ctxHandler unifiedlogger.LoggerWrapper
 
-	apiHandlerOptions := &log.HandlerOptions{
-		ReplaceAttr: func(groups []string, a log.Attr) log.Attr {
+	apiHandlerOptions := &unifiedlogger.LoggerWrapper{
+		ReplaceAttr: func(groups []string, a unifiedlogger.LoggerWrapper) unifiedlogger.LoggerWrapper {
 			a.Key = strings.TrimPrefix(a.Key, "grpc.")
 			a.Key = strings.ReplaceAll(a.Key, ".", "_")
 			return a
 		},
 	}
-	ctxHandlerOptions := &log.HandlerOptions{
+	ctxHandlerOptions := &unifiedlogger.LoggerWrapper{
 		AddSource: true,
-		ReplaceAttr: func(groups []string, a log.Attr) log.Attr {
-			if a.Key == log.SourceKey {
+		ReplaceAttr: func(groups []string, a unifiedlogger.LoggerWrapper) unifiedlogger.LoggerWrapper {
+			if a.Key == unifiedlogger.SourceKey {
 				// Needed to add to prevent "CtxLog" key from being changed as well
 				switch value := a.Value.Any().(type) {
-				case *log.Source:
+				case *unifiedlogger.Source:
 					if strings.Contains(value.File, ".go") {
 						a.Key = "location"
 					}
@@ -116,19 +116,19 @@ func DefaultServerInterceptors(options ServerInterceptorLogOptions) []grpc.Unary
 		},
 	}
 
-	if _, ok := options.Logger.Handler().(*log.JSONHandler); ok {
-		apiHandler = log.NewJSONHandler(options.APIOutput, apiHandlerOptions)
-		ctxHandler = log.NewJSONHandler(options.CtxOutput, ctxHandlerOptions)
+	if _, ok := options.Logger.Handler().(*unifiedlogger.LoggerWrapper); ok {
+		apiHandler = unifiedlogger.NewJSONHandler(options.APIOutput, apiHandlerOptions)
+		ctxHandler = unifiedlogger.NewJSONHandler(options.CtxOutput, ctxHandlerOptions)
 	} else {
-		apiHandler = log.NewTextHandler(options.APIOutput, apiHandlerOptions)
-		ctxHandler = log.NewTextHandler(options.CtxOutput, ctxHandlerOptions)
+		apiHandler = unifiedlogger.NewTextHandler(options.APIOutput, apiHandlerOptions)
+		ctxHandler = unifiedlogger.NewTextHandler(options.CtxOutput, ctxHandlerOptions)
 	}
 
 	apiHandler = apiHandler.WithAttrs(options.APIAttributes)
 	ctxHandler = ctxHandler.WithAttrs(options.CtxAttributes)
 
-	apiRequestLogger := log.New(apiHandler).With("source", "ApiRequestLog")
-	appCtxlogger := log.New(ctxHandler).With("source", "CtxLog")
+	apiRequestLogger := unifiedlogger.New(apiHandler).With("source", "ApiRequestLog")
+	appCtxlogger := unifiedlogger.New(ctxHandler).With("source", "CtxLog")
 	validator, err := protovalidate.New()
 	if err != nil {
 		panic(err)
