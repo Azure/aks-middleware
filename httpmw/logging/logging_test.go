@@ -75,11 +75,10 @@ var _ = Describe("Httpmw Integration Test", func() {
 
 			w := httptest.NewRecorder()
 
-			// Create request with required headers
 			req := httptest.NewRequest("GET", "/", nil)
-			req.Header.Set("User-Agent", "TestAgent")        // CallerAgent
-			req.Header.Set("ClientAppID", "TestClientAppID") // CallerIdentities
-			req.Header.Set("Region", "us-west")              // TargetResource region
+			req.Header.Set("User-Agent", "TestAgent")
+			req.Header.Set("x-ms-client-app-id", "TestClientAppID")
+			req.Header.Set("Region", "us-west")
 
 			router.ServeHTTP(w, req)
 
@@ -90,10 +89,8 @@ var _ = Describe("Httpmw Integration Test", func() {
 
 			msgCtx := context.TODO()
 
-			// Use w.Result().StatusCode to get the status from the recorded response
 			mw.sendOtelAuditEvent(msgCtx, w.Result().StatusCode, req)
 
-			// Validate log output and ensure audit event was sent
 			Expect(buf.String()).To(ContainSubstring("sending audit logs"))
 			Expect(buf.String()).To(ContainSubstring("audit event sent successfully"))
 		})
@@ -105,8 +102,7 @@ var _ = Describe("Httpmw Integration Test", func() {
 			}
 			auditClient, err := audit.New(cc)
 
-			// Expect an error during client creation since we're simulating a failure
-			Expect(err).ToNot(BeNil()) // Updated expectation to expect a non-nil error
+			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("failed to create audit event"))
 
 			buf := new(bytes.Buffer)
@@ -129,7 +125,6 @@ var _ = Describe("Httpmw Integration Test", func() {
 
 			msgCtx := context.TODO()
 
-			// Use w.Result().StatusCode to get the status from the recorded response
 			mw.sendOtelAuditEvent(msgCtx, w.Result().StatusCode, req)
 
 			Expect(buf.String()).To(ContainSubstring("otel audit client is nil"))
@@ -146,7 +141,6 @@ var _ = Describe("Httpmw Integration Test", func() {
 
 			w := httptest.NewRecorder()
 
-			// Create request with required headers
 			req := httptest.NewRequest("GET", "/", nil)
 
 			router.ServeHTTP(w, req)
@@ -158,10 +152,8 @@ var _ = Describe("Httpmw Integration Test", func() {
 
 			msgCtx := context.TODO()
 
-			// Use w.Result().StatusCode to get the status from the recorded response
 			mw.sendOtelAuditEvent(msgCtx, w.Result().StatusCode, req)
 
-			// Validate log output and ensure audit event was sent
 			Expect(buf.String()).To(ContainSubstring("failed to send audit event"))
 		})
 	})
