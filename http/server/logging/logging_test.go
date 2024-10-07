@@ -2,6 +2,8 @@ package logging
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -9,16 +11,27 @@ import (
 
 	"github.com/Azure/aks-middleware/http/server/requestid"
 	"github.com/gorilla/mux"
+	"github.com/microsoft/go-otel-audit/audit"
+	"github.com/microsoft/go-otel-audit/audit/conn"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Httpmw", func() {
+var _ = Describe("Httpmw Integration Test", func() {
 	var (
-		router     *mux.Router
-		buf        *bytes.Buffer
-		slogLogger *slog.Logger
+		router      *mux.Router
+		auditClient *audit.Client
 	)
+
+	// Helper function to create a real audit client
+	createAuditClient := func() *audit.Client {
+		cc := func() (conn.Audit, error) {
+			return conn.NewNoOP(), nil
+		}
+		client, err := audit.New(cc)
+		Expect(err).To(BeNil())
+		return client
+	}
 
 	BeforeEach(func() {
 
@@ -40,10 +53,20 @@ var _ = Describe("Httpmw", func() {
 			time.Sleep(10 * time.Millisecond)
 			w.WriteHeader(http.StatusOK)
 		})
+		auditClient = createAuditClient()
 	})
 
-	Describe("LoggingMiddleware", func() {
+	Describe("LoggingMiddleware with Real Audit Client", func() {
 		It("should log and return OK status", func() {
+			buf := new(bytes.Buffer)
+			slogLogger := slog.New(slog.NewJSONHandler(buf, nil))
+			router.Use(NewLogging(slogLogger, auditClient, nil))
+
+			router.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
+				time.Sleep(10 * time.Millisecond)
+				w.WriteHeader(http.StatusOK)
+			})
+
 			w := httptest.NewRecorder()
 			req := httptest.NewRequest("GET", "/", nil)
 
@@ -72,6 +95,108 @@ var _ = Describe("Httpmw", func() {
 			Expect(buf.String()).To(ContainSubstring(`"correlationid":"test-correlation-id"`))
 			Expect(buf.String()).ToNot(ContainSubstring(`"armclientrequestid"`))
 			Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
+			Expect(w.Result().StatusCode).To(Equal(200))
+		})
+
+		It("should send audit event on request completion", func() {
+			buf := new(bytes.Buffer)
+			slogLogger := slog.New(slog.NewJSONHandler(buf, nil))
+			router.Use(NewLogging(slogLogger, auditClient, nil))
+
+			router.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})
+
+			w := httptest.NewRecorder()
+
+			// Create request with required headers
+			req := httptest.NewRequest("GET", "/", nil)
+			req.Header.Set("User-Agent", "TestAgent")        // CallerAgent
+			req.Header.Set("ClientAppID", "TestClientAppID") // CallerIdentities
+			req.Header.Set("Region", "us-west")              // TargetResource region
+
+			router.ServeHTTP(w, req)
+
+			mw := &loggingMiddleware{
+				otelAuditClient: auditClient,
+				logger:          *slogLogger,
+			}
+
+			msgCtx := context.TODO()
+
+			// Use w.Result().StatusCode to get the status from the recorded response
+			mw.sendOtelAuditEvent(msgCtx, w.Result().StatusCode, req)
+
+			// Validate log output and ensure audit event was sent
+			Expect(buf.String()).To(ContainSubstring("sending audit logs"))
+			Expect(buf.String()).To(ContainSubstring("audit event sent successfully"))
+		})
+
+		It("should log error if audit event creation fails", func() {
+			// Simulate a failing audit client
+			cc := func() (conn.Audit, error) {
+				return nil, errors.New("failed to create audit event")
+			}
+			auditClient, err := audit.New(cc)
+
+			// Expect an error during client creation since we're simulating a failure
+			Expect(err).ToNot(BeNil()) // Updated expectation to expect a non-nil error
+			Expect(err.Error()).To(Equal("failed to create audit event"))
+
+			buf := new(bytes.Buffer)
+			slogLogger := slog.New(slog.NewJSONHandler(buf, nil))
+			router.Use(NewLogging(slogLogger, auditClient, nil))
+
+			router.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusInternalServerError)
+			})
+
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest("GET", "/", nil)
+
+			router.ServeHTTP(w, req)
+
+			mw := &loggingMiddleware{
+				otelAuditClient: auditClient,
+				logger:          *slogLogger,
+			}
+
+			msgCtx := context.TODO()
+
+			// Use w.Result().StatusCode to get the status from the recorded response
+			mw.sendOtelAuditEvent(msgCtx, w.Result().StatusCode, req)
+
+			Expect(buf.String()).To(ContainSubstring("otel audit client is nil"))
+		})
+
+		It("should log an error when the record object is invalid", func() {
+			buf := new(bytes.Buffer)
+			slogLogger := slog.New(slog.NewJSONHandler(buf, nil))
+			router.Use(NewLogging(slogLogger, auditClient, nil))
+
+			router.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})
+
+			w := httptest.NewRecorder()
+
+			// Create request with required headers
+			req := httptest.NewRequest("GET", "/", nil)
+
+			router.ServeHTTP(w, req)
+
+			mw := &loggingMiddleware{
+				otelAuditClient: auditClient,
+				logger:          *slogLogger,
+			}
+
+			msgCtx := context.TODO()
+
+			// Use w.Result().StatusCode to get the status from the recorded response
+			mw.sendOtelAuditEvent(msgCtx, w.Result().StatusCode, req)
+
+			// Validate log output and ensure audit event was sent
+			Expect(buf.String()).To(ContainSubstring("failed to send audit event"))
 		})
 	})
 })
