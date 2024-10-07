@@ -115,7 +115,7 @@ func (l *loggingMiddleware) sendOtelAuditEvent(ctx context.Context, statusCode i
 		return
 	}
 
-	msg := l.createOtelAuditEvent(ctx, statusCode, req)
+	msg := createOtelAuditEvent(l.logger, statusCode, req, l.operationCategoryDescriptionsForOther)
 	l.logger.Info("sending audit logs")
 	if err := l.otelAuditClient.Send(ctx, msg); err != nil {
 		l.logger.Error("failed to send audit event", "error", err)
@@ -124,14 +124,14 @@ func (l *loggingMiddleware) sendOtelAuditEvent(ctx context.Context, statusCode i
 	}
 }
 
-func (l *loggingMiddleware) createOtelAuditEvent(ctx context.Context, statusCode int, req *http.Request) msgs.Msg {
+func createOtelAuditEvent(logger slog.Logger, statusCode int, req *http.Request, opCategoryDesc map[string]string) msgs.Msg {
 	host, _, err := net.SplitHostPort(req.RemoteAddr)
 	if err != nil {
-		l.logger.Error("failed to split host and port", "error", err)
+		logger.Error("failed to split host and port", "error", err)
 	}
 	addr, err := msgs.ParseAddr(host)
 	if err != nil {
-		l.logger.Error("failed to parse address", "error", err)
+		logger.Error("failed to parse address", "error", err)
 	}
 
 	tr := map[string][]msgs.TargetResourceEntry{
@@ -145,13 +145,13 @@ func (l *loggingMiddleware) createOtelAuditEvent(ctx context.Context, statusCode
 
 	record := msgs.Record{
 		CallerIpAddress:              addr,
-		CallerIdentities:             getCallerIdentities(req), // No OperationTracking needed
-		OperationCategories:          []msgs.OperationCategory{l.getOperationCategory(req.Method)},
-		OperationCategoryDescription: l.getOperationCategoryDescription(req.Method),
+		CallerIdentities:             getCallerIdentities(req),
+		OperationCategories:          []msgs.OperationCategory{getOperationCategory(req.Method, opCategoryDesc)},
+		OperationCategoryDescription: getOperationCategoryDescription(req.Method, opCategoryDesc),
 		TargetResources:              tr,
-		CallerAccessLevels:           []string{"NA"}, // As before, assuming the access level is pre-defined
+		CallerAccessLevels:           []string{"NA"},
 		OperationAccessLevel:         "Azure Kubernetes Fleet Manager Contributor Role",
-		OperationName:                req.Method, // Method as operation name
+		OperationName:                req.Method,
 		CallerAgent:                  req.UserAgent(),
 		OperationType:                getOperationType(req.Method),
 		OperationResult:              getOperationResult(statusCode),
@@ -164,12 +164,14 @@ func (l *loggingMiddleware) createOtelAuditEvent(ctx context.Context, statusCode
 	}
 }
 
-// Simplified caller identity map creation based on the request
 func getCallerIdentities(req *http.Request) map[msgs.CallerIdentityType][]msgs.CallerIdentityEntry {
 	caller := make(map[msgs.CallerIdentityType][]msgs.CallerIdentityEntry)
 
-	// Here you can parse headers or other request properties to map identities
-	clientAppID := req.Header.Get("ClientAppID")
+	clientAppID := req.Header.Get("x-ms-client-app-id")
+	clientPrincipalName := req.Header.Get("x-ms-client-principal-name")
+	subscriptionID := req.Header.Get("subscriptionID") // Assuming subscription ID is in the header
+	clientTenantID := req.Header.Get("x-ms-client-tenant-id")
+
 	if clientAppID != "" {
 		caller[msgs.ApplicationID] = []msgs.CallerIdentityEntry{
 			{
@@ -179,19 +181,45 @@ func getCallerIdentities(req *http.Request) map[msgs.CallerIdentityType][]msgs.C
 		}
 	}
 
+	if clientPrincipalName != "" {
+		caller[msgs.UPN] = []msgs.CallerIdentityEntry{
+			{
+				Identity:    clientPrincipalName,
+				Description: "client principal name",
+			},
+		}
+	}
+
+	if subscriptionID != "" {
+		caller[msgs.SubscriptionID] = []msgs.CallerIdentityEntry{
+			{
+				Identity:    subscriptionID,
+				Description: "client subscription ID",
+			},
+		}
+	}
+
+	if clientTenantID != "" {
+		caller[msgs.TenantID] = []msgs.CallerIdentityEntry{
+			{
+				Identity:    clientTenantID,
+				Description: "client tenant ID",
+			},
+		}
+	}
+
 	return caller
 }
 
-// Updated to use HTTP method to determine the operation category
-func (l *loggingMiddleware) getOperationCategory(method string) msgs.OperationCategory {
-	if _, ok := l.operationCategoryDescriptionsForOther[method]; ok {
+func getOperationCategory(method string, opCategoryDesc map[string]string) msgs.OperationCategory {
+	if _, ok := opCategoryDesc[method]; ok {
 		return msgs.OCOther
 	}
 	return msgs.ResourceManagement
 }
 
-func (l *loggingMiddleware) getOperationCategoryDescription(method string) string {
-	if desc, ok := l.operationCategoryDescriptionsForOther[method]; ok {
+func getOperationCategoryDescription(method string, opCategoryDesc map[string]string) string {
+	if desc, ok := opCategoryDesc[method]; ok {
 		return desc
 	}
 	return ""
