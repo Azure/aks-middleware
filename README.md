@@ -55,31 +55,36 @@ Ancestors need to be loggable in order to examine the annotations on the leaf no
 
 The source code for the external loggable field option is located at https://github.com/toma3233/loggable. Whenever it is updated, it is pushed to the following Buf Schema Registry as a module: https://buf.build/service-hub/loggable. Command used to authenticate before pushing to the BSR is "buf registry login" which prompts for BSR username and BSR token. The .netrc file is updated with these credentials. 
 
-# Logging REST API Interactions
+# Policy
 
-The `LogRequest` function introduced in `logging/logging.go` is a shared utility for logging REST API interactions. It is designed to be used in various parts of a service or module to ensure consistent logging practices.
+The `policy` package provides a logging policy for HTTP requests made using the Azure SDK for Go.
 
-## Function Overview
+## Logging Policy
 
-`LogRequest` takes a `LogRequestParams` struct as input, which includes the logger instance, start time of the request, the request itself, the response, and any error that occurred. It logs the request method, URL, service, response status, and latency. In case of an error, it logs the error message.
+The logging policy logs details about each HTTP request and response, including the request method, URL, status code, and duration.
 
-## Usage Example
+### Usage
+To use the logging policy, you need to create a logger and then apply the policy to your HTTP client.
 
-```go
-logging.LogRequest(logging.LogRequestParams{
-    Logger:    loggerInstance,
-    StartTime: time.Now(),
-    Request:   httpRequest,
-    Response:  httpResponse,
-    Error:     err,
-})
-```
+Code example is included in the test code
 
-This function is utilized in `policy/policy.go` and `restlogger/restlogger.go` to log interactions with external REST APIs, enhancing the observability of the service.
+# Restlogger
 
-## Integration Guidance
+The restlogger package provides a logging round tripper for HTTP clients.
 
-To integrate `LogRequest` into other services or modules, instantiate a `LogRequestParams` struct with the appropriate values and call `LogRequest`. This ensures that all REST API interactions are logged in a standardized format, facilitating debugging and monitoring.
+## Logging RoundTripper
+The logging round tripper logs details about each HTTP request and response, including the request method, URL, status code, and duration.
+
+### Usage
+To use the logging round tripper, you need to create a logger and then apply the round tripper to your HTTP client.
+
+Code example is included in the test code
+
+
+
+
+
+
 
 # HTTP Middleware
 
@@ -87,108 +92,21 @@ The `httpmw` folder contains middleware for HTTP servers built using the `gorill
 
 ## Logging Middleware
 
-The logging middleware logs details about each HTTP request and response, including the request method, URL, status code, and duration. It also integrates with the OpenTelemetry audit client to send audit events.
+The logging middleware logs details about each HTTP request and response, including the request method, URL, status code, and duration.
 
 ### Usage
 
-To use the logging middleware, you need to create a logger and an audit client, then apply the middleware to your router:
+To use the logging middleware, you need to create a logger and then apply the middleware to your router.
 
-```go
-package main
-
-import (
-    "log/slog"
-    "net/http"
-    "github.com/gorilla/mux"
-    "github.com/microsoft/go-otel-audit/audit"
-    "github.com/your_project/httpmw/logging"
-)
-
-func main() {
-    router := mux.NewRouter()
-
-    // Create a logger
-    buf := new(bytes.Buffer)
-    slogLogger := slog.New(slog.NewJSONHandler(buf, nil))
-
-    // Create an audit client
-    cc := func() (conn.Audit, error) {
-        return conn.NewNoOP(), nil
-    }
-    auditClient, err := audit.New(cc)
-    if err != nil {
-        log.Fatalf("failed to create audit client: %v", err)
-    }
-
-    // Apply the logging middleware
-    router.Use(logging.NewLogging(slogLogger, auditClient, nil))
-
-    // Define your routes
-    router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-        w.WriteHeader(http.StatusOK)
-    })
-
-    http.ListenAndServe(":8080", router)
-}
-```
+Code example is included in the test code.
 
 ## Recovery Middleware
 The recovery middleware recovers from panics in your HTTP handlers and logs the error. It can use a custom panic handler if provided.
 
 ### Usage
-To use the recovery middleware, you need to create a logger and apply the middleware to your router:
-```go
-package main
+To use the recovery middleware, you need to create a logger and apply the middleware to your router. You can also provide a custom panic handler.
 
-import (
-    "log/slog"
-    "net/http"
-    "github.com/gorilla/mux"
-    "github.com/your_project/httpmw/recovery"
-)
-
-func main() {
-    router := mux.NewRouter()
-
-    // Create a logger
-    logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-
-    // Apply the recovery middleware
-    router.Use(recovery.NewPanicHandling(logger, nil))
-
-    // Define your routes
-    router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-        panic("oops")
-    })
-
-    http.ListenAndServe(":8080", router)
-}
-```
-
-You can also provide a custom panic handler:
-```go
-func customPanicHandler(logger slog.Logger, w http.ResponseWriter, r *http.Request, err interface{}) {
-    logger.Info(fmt.Sprintf("Custom panic occurred: %v", err))
-    http.Error(w, "Bad Request", http.StatusBadRequest)
-}
-
-func main() {
-    router := mux.NewRouter()
-
-    // Create a logger
-    logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-
-    // Apply the recovery middleware with a custom panic handler
-    router.Use(recovery.NewPanicHandling(logger, customPanicHandler))
-
-    // Define your routes
-    router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-        panic("oops")
-    })
-
-    http.ListenAndServe(":8080", router)
-}
-```
+Code example is included in the test code
 
 
 
