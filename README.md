@@ -81,7 +81,115 @@ This function is utilized in `policy/policy.go` and `restlogger/restlogger.go` t
 
 To integrate `LogRequest` into other services or modules, instantiate a `LogRequestParams` struct with the appropriate values and call `LogRequest`. This ensures that all REST API interactions are logged in a standardized format, facilitating debugging and monitoring.
 
-# aks-middleware
+# HTTP Middleware
+
+The `httpmw` folder contains middleware for HTTP servers built using the `gorilla/mux` package. This middleware includes logging and recovery functionalities.
+
+## Logging Middleware
+
+The logging middleware logs details about each HTTP request and response, including the request method, URL, status code, and duration. It also integrates with the OpenTelemetry audit client to send audit events.
+
+### Usage
+
+To use the logging middleware, you need to create a logger and an audit client, then apply the middleware to your router:
+
+```go
+package main
+
+import (
+    "log/slog"
+    "net/http"
+    "github.com/gorilla/mux"
+    "github.com/microsoft/go-otel-audit/audit"
+    "github.com/your_project/httpmw/logging"
+)
+
+func main() {
+    router := mux.NewRouter()
+
+    // Create a logger
+    buf := new(bytes.Buffer)
+    slogLogger := slog.New(slog.NewJSONHandler(buf, nil))
+
+    // Create an audit client
+    cc := func() (conn.Audit, error) {
+        return conn.NewNoOP(), nil
+    }
+    auditClient, err := audit.New(cc)
+    if err != nil {
+        log.Fatalf("failed to create audit client: %v", err)
+    }
+
+    // Apply the logging middleware
+    router.Use(logging.NewLogging(slogLogger, auditClient, nil))
+
+    // Define your routes
+    router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+        w.WriteHeader(http.StatusOK)
+    })
+
+    http.ListenAndServe(":8080", router)
+}
+```
+
+## Recovery Middleware
+The recovery middleware recovers from panics in your HTTP handlers and logs the error. It can use a custom panic handler if provided.
+
+### Usage
+To use the recovery middleware, you need to create a logger and apply the middleware to your router:
+```go
+package main
+
+import (
+    "log/slog"
+    "net/http"
+    "github.com/gorilla/mux"
+    "github.com/your_project/httpmw/recovery"
+)
+
+func main() {
+    router := mux.NewRouter()
+
+    // Create a logger
+    logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+
+    // Apply the recovery middleware
+    router.Use(recovery.NewPanicHandling(logger, nil))
+
+    // Define your routes
+    router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+        panic("oops")
+    })
+
+    http.ListenAndServe(":8080", router)
+}
+```
+
+You can also provide a custom panic handler:
+```go
+func customPanicHandler(logger slog.Logger, w http.ResponseWriter, r *http.Request, err interface{}) {
+    logger.Info(fmt.Sprintf("Custom panic occurred: %v", err))
+    http.Error(w, "Bad Request", http.StatusBadRequest)
+}
+
+func main() {
+    router := mux.NewRouter()
+
+    // Create a logger
+    logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+
+    // Apply the recovery middleware with a custom panic handler
+    router.Use(recovery.NewPanicHandling(logger, customPanicHandler))
+
+    // Define your routes
+    router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+        panic("oops")
+    })
+
+    http.ListenAndServe(":8080", router)
+}
+```
+
 
 
 
