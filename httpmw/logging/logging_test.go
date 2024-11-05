@@ -14,24 +14,26 @@ import (
 
 var _ = Describe("Httpmw", func() {
 	var (
-		router *mux.Router
+		router     *mux.Router
+		buf        *bytes.Buffer
+		slogLogger *slog.Logger
 	)
 
 	BeforeEach(func() {
+		buf = new(bytes.Buffer)
+		slogLogger = slog.New(slog.NewJSONHandler(buf, nil))
+
 		router = mux.NewRouter()
+		router.Use(NewLogging(slogLogger))
+
+		router.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
+			time.Sleep(10 * time.Millisecond)
+			w.WriteHeader(http.StatusOK)
+		})
 	})
 
 	Describe("LoggingMiddleware", func() {
 		It("should log and return OK status", func() {
-			buf := new(bytes.Buffer)
-			slogLogger := slog.New(slog.NewJSONHandler(buf, nil))
-			router.Use(NewLogging(slogLogger))
-
-			router.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
-				time.Sleep(10 * time.Millisecond)
-				w.WriteHeader(http.StatusOK)
-			})
-
 			w := httptest.NewRecorder()
 			req := httptest.NewRequest("GET", "/", nil)
 
@@ -45,8 +47,20 @@ var _ = Describe("Httpmw", func() {
 			Expect(buf.String()).To(ContainSubstring(`"time_ms":`))
 			Expect(buf.String()).To(ContainSubstring(`"service":"`))
 			Expect(buf.String()).To(ContainSubstring(`"url":"`))
-			Expect(w.Result().StatusCode).To(Equal(200))
+			Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
+		})
 
+		It("should log operation ID and correlation ID", func() {
+			req := httptest.NewRequest("GET", "http://example.com/", nil)
+			req.Header.Set(RequestAcsOperationIDHeader, "test-operation-id")
+			req.Header.Set(RequestCorrelationIDHeader, "test-correlation-id")
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, req)
+
+			Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
+			Expect(buf.String()).To(ContainSubstring(`"operationID":"test-operation-id"`))
+			Expect(buf.String()).To(ContainSubstring(`"correlationID":"test-correlation-id"`))
 		})
 	})
 })
