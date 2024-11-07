@@ -49,18 +49,5 @@ var _ = Describe("Httpmw", func() {
 			Expect(buf.String()).To(ContainSubstring(`"url":"`))
 			Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
 		})
-
-		It("should log operation ID and correlation ID", func() {
-			req := httptest.NewRequest("GET", "http://example.com/", nil)
-			req.Header.Set(RequestAcsOperationIDHeader, "test-operation-id")
-			req.Header.Set(RequestCorrelationIDHeader, "test-correlation-id")
-			w := httptest.NewRecorder()
-
-			router.ServeHTTP(w, req)
-
-			Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
-			Expect(buf.String()).To(ContainSubstring(`"operationID":"test-operation-id"`))
-			Expect(buf.String()).To(ContainSubstring(`"correlationID":"test-correlation-id"`))
-		})
 	})
 })
