@@ -17,7 +17,7 @@ var _ = Describe("OperationID Middleware", func() {
 
 	BeforeEach(func() {
 		router = mux.NewRouter()
-		router.Use(Middleware())
+		router.Use(NewOperationIDMiddleware())
 		router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 			operationID, _ := ctx.Value(OperationIDKey).(string)
