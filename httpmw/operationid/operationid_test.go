@@ -29,7 +29,6 @@ var _ = Describe("OperationID Middleware", func() {
 				clientSessionID      string
 				clientApplicationID  string
 				clientPrincipalName  string
-				responseARMRequestID string
 			)
 			if ok {
 				if vals := md.Get(string(CorrelationIDKey)); len(vals) > 0 {
@@ -50,9 +49,6 @@ var _ = Describe("OperationID Middleware", func() {
 				if vals := md.Get(string(ClientPrincipalNameKey)); len(vals) > 0 {
 					clientPrincipalName = vals[0]
 				}
-				if vals := md.Get(string(ResponseARMRequestIDKey)); len(vals) > 0 {
-					responseARMRequestID = vals[0]
-				}
 			}
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(
@@ -61,8 +57,7 @@ var _ = Describe("OperationID Middleware", func() {
 					graphClientRequestID + "," +
 					clientSessionID + "," +
 					clientApplicationID + "," +
-					clientPrincipalName + "," +
-					responseARMRequestID,
+					clientPrincipalName,
 			))
 		})
 		recorder = httptest.NewRecorder()
@@ -76,7 +71,6 @@ var _ = Describe("OperationID Middleware", func() {
 		req.Header.Set(RequestClientSessionIDHeader, "test-client-session-id")
 		req.Header.Set(RequestClientApplicationIDHeader, "test-client-application-id")
 		req.Header.Set(RequestClientPrincipalNameHeader, "test-client-principal-name")
-		req.Header.Set(ResponseARMRequestIDHeader, "test-response-arm-request-id")
 
 		router.ServeHTTP(recorder, req)
 
@@ -87,8 +81,7 @@ var _ = Describe("OperationID Middleware", func() {
 				"test-graph-client-request-id," +
 				"test-client-session-id," +
 				"test-client-application-id," +
-				"test-client-principal-name," +
-				"test-response-arm-request-id",
+				"test-client-principal-name",
 		))
 	})
 
@@ -98,7 +91,7 @@ var _ = Describe("OperationID Middleware", func() {
 		router.ServeHTTP(recorder, req)
 
 		Expect(recorder.Code).To(Equal(http.StatusOK))
-		Expect(recorder.Body.String()).To(Equal(",,,,,,"))
+		Expect(recorder.Body.String()).To(Equal(",,,,,"))
 	})
 
 	It("should extract custom headers with a custom extractor", func() {

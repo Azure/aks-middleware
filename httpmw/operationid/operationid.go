@@ -16,14 +16,13 @@ const (
 	ClientSessionIDKey      contextKey = "clientSessionID"
 	ClientApplicationIDKey  contextKey = "clientApplicationID"
 	ClientPrincipalNameKey  contextKey = "clientPrincipalName"
-	ResponseARMRequestIDKey contextKey = "responseARMRequestID"
 
 	// Details can be found here:
 	// https://github.com/Azure/azure-resource-manager-rpc/blob/master/v1.0/common-api-details.md#client-request-headers
 	RequestCorrelationIDHeader = "x-ms-correlation-request-id"
 	// RequestARMClientRequestIDHeader  Caller-specified value identifying the request, in the form of a GUID
 	RequestARMClientRequestIDHeader = "x-ms-client-request-id"
-	// RequestGraphClientRequestIDHeader is the http header name graph adds for the client request id. Unclear how this is different from RequestARMClientRequestIDHeader and if we can remove it.
+	// RequestGraphClientRequestIDHeader is the http header name graph adds for the client request id.
 	RequestGraphClientRequestIDHeader = "client-request-id"
 	// RequestClientSessionIDHeader is the http header name ARM adds for the client session id. AKS treats it as operation
 	// AKS choses to populate it with operation id.
@@ -33,8 +32,6 @@ const (
 	RequestClientApplicationIDHeader = "x-ms-client-app-id"
 	// RequestClientPrincipalNameHeader is the http header name ARM adds for the client principal name
 	RequestClientPrincipalNameHeader = "x-ms-client-principal-name"
-	// ResponseARMRequestIDHeader is the http header name our rp adds to uniquely identify this request, used by ARM
-	ResponseARMRequestIDHeader = "x-ms-request-id"
 )
 
 // HeaderExtractor defines a function to extract headers from an HTTP request.
@@ -90,7 +87,6 @@ func DefaultHeaderExtractor(r *http.Request) map[string]string {
 		string(ClientSessionIDKey):      r.Header.Get(RequestClientSessionIDHeader),
 		string(ClientApplicationIDKey):  r.Header.Get(RequestClientApplicationIDHeader),
 		string(ClientPrincipalNameKey):  r.Header.Get(RequestClientPrincipalNameHeader),
-		string(ResponseARMRequestIDKey): r.Header.Get(ResponseARMRequestIDHeader),
 	}
 	return headers
 }
