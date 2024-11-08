@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"time"
 
+	"github.com/Azure/aks-middleware/httpmw/operationid"
 	"github.com/gorilla/mux"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -19,11 +20,24 @@ var _ = Describe("Httpmw", func() {
 		slogLogger *slog.Logger
 	)
 
+	const (
+		RequestAcsOperationIDHeader = "x-ms-acs-operation-id"
+	)
+
 	BeforeEach(func() {
+
 		buf = new(bytes.Buffer)
 		slogLogger = slog.New(slog.NewJSONHandler(buf, nil))
 
 		router = mux.NewRouter()
+
+		customExtractor := func(r *http.Request) map[string]string {
+			return map[string]string{
+				string(operationid.CorrelationIDKey): r.Header.Get(operationid.RequestCorrelationIDHeader),
+				"acsoperationID":                     r.Header.Get(RequestAcsOperationIDHeader),
+			}
+		}
+		router.Use(operationid.NewOperationIDMiddlewareWithExtractor(customExtractor))
 		router.Use(NewLogging(slogLogger))
 
 		router.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
@@ -47,6 +61,19 @@ var _ = Describe("Httpmw", func() {
 			Expect(buf.String()).To(ContainSubstring(`"time_ms":`))
 			Expect(buf.String()).To(ContainSubstring(`"service":"`))
 			Expect(buf.String()).To(ContainSubstring(`"url":"`))
+			Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
+		})
+
+		It("should log operationID and correlationID from headers", func() {
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest("GET", "/", nil)
+			req.Header.Set(RequestAcsOperationIDHeader, "test-operation-id")
+			req.Header.Set(operationid.RequestCorrelationIDHeader, "test-correlation-id")
+
+			router.ServeHTTP(w, req)
+
+			Expect(buf.String()).To(ContainSubstring(`"acsoperationid":"test-operation-id"`))
+			Expect(buf.String()).To(ContainSubstring(`"correlationid":"test-correlation-id"`))
 			Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
 		})
 	})

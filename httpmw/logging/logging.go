@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Azure/aks-middleware/httpmw/operationid"
 	"github.com/gorilla/mux"
+	"google.golang.org/grpc/metadata"
 )
 
 // TODO (Tom): Add a logger wrapper in its own package
@@ -66,10 +66,8 @@ func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (l *loggingMiddleware) LogRequestStart(ctx context.Context, r *http.Request) {
-	operationID, _ := ctx.Value(operationid.OperationIDKey).(string)
-	correlationID, _ := ctx.Value(operationid.CorrelationIDKey).(string)
-
-	l.logger.InfoContext(ctx, "RequestStart",
+	md, ok := metadata.FromIncomingContext(ctx)
+	attributes := []interface{}{
 		"source", "ApiRequestLog",
 		"protocol", "HTTP",
 		"method_type", "unary",
@@ -77,16 +75,22 @@ func (l *loggingMiddleware) LogRequestStart(ctx context.Context, r *http.Request
 		"method", r.Method,
 		"service", r.Host,
 		"url", r.URL.String(),
-		"operationID", operationID,
-		"correlationID", correlationID,
-	)
+	}
+
+	if ok {
+		for key, values := range md {
+			for _, value := range values {
+				attributes = append(attributes, key, value)
+			}
+		}
+	}
+
+	l.logger.InfoContext(ctx, "RequestStart", attributes...)
 }
 
 func (l *loggingMiddleware) LogRequestEnd(ctx context.Context, r *http.Request, msg string, statusCode int, duration time.Duration) {
-	operationID, _ := ctx.Value(operationid.OperationIDKey).(string)
-	correlationID, _ := ctx.Value(operationid.CorrelationIDKey).(string)
-
-	l.logger.InfoContext(ctx, msg,
+	md, ok := metadata.FromIncomingContext(ctx)
+	attributes := []interface{}{
 		"source", "ApiRequestLog",
 		"protocol", "HTTP",
 		"method_type", "unary",
@@ -96,7 +100,15 @@ func (l *loggingMiddleware) LogRequestEnd(ctx context.Context, r *http.Request, 
 		"url", r.URL.String(),
 		"code", statusCode,
 		"time_ms", duration.Milliseconds(),
-		"operationID", operationID,
-		"correlationID", correlationID,
-	)
+	}
+
+	if ok {
+		for key, values := range md {
+			for _, value := range values {
+				attributes = append(attributes, key, value)
+			}
+		}
+	}
+
+	l.logger.InfoContext(ctx, msg, attributes...)
 }
