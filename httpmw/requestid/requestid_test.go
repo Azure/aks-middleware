@@ -1,4 +1,4 @@
-package operationid
+package requestid
 
 import (
 	"net/http"
@@ -10,7 +10,7 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-var _ = Describe("OperationID Middleware", func() {
+var _ = Describe("RequestID Middleware", func() {
 	var (
 		router   *mux.Router
 		recorder *httptest.ResponseRecorder
@@ -18,17 +18,14 @@ var _ = Describe("OperationID Middleware", func() {
 
 	BeforeEach(func() {
 		router = mux.NewRouter()
-		router.Use(NewOperationIDMiddleware()) // Use default extractor
+		router.Use(NewRequestIDMiddleware()) // Use default extractor
 		router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 			md, ok := metadata.FromIncomingContext(ctx)
 			var (
-				correlationID        string
-				armClientRequestID   string
-				graphClientRequestID string
-				clientSessionID      string
-				clientApplicationID  string
-				clientPrincipalName  string
+				correlationID      string
+				armClientRequestID string
+				clientSessionID    string
 			)
 			if ok {
 				if vals := md.Get(string(CorrelationIDKey)); len(vals) > 0 {
@@ -37,27 +34,15 @@ var _ = Describe("OperationID Middleware", func() {
 				if vals := md.Get(string(ARMClientRequestIDKey)); len(vals) > 0 {
 					armClientRequestID = vals[0]
 				}
-				if vals := md.Get(string(GraphClientRequestIDKey)); len(vals) > 0 {
-					graphClientRequestID = vals[0]
-				}
 				if vals := md.Get(string(ClientSessionIDKey)); len(vals) > 0 {
 					clientSessionID = vals[0]
-				}
-				if vals := md.Get(string(ClientApplicationIDKey)); len(vals) > 0 {
-					clientApplicationID = vals[0]
-				}
-				if vals := md.Get(string(ClientPrincipalNameKey)); len(vals) > 0 {
-					clientPrincipalName = vals[0]
 				}
 			}
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(
 				correlationID + "," +
 					armClientRequestID + "," +
-					graphClientRequestID + "," +
-					clientSessionID + "," +
-					clientApplicationID + "," +
-					clientPrincipalName,
+					clientSessionID,
 			))
 		})
 		recorder = httptest.NewRecorder()
@@ -67,10 +52,7 @@ var _ = Describe("OperationID Middleware", func() {
 		req := httptest.NewRequest("GET", "/", nil)
 		req.Header.Set(RequestCorrelationIDHeader, "test-correlation-id")
 		req.Header.Set(RequestARMClientRequestIDHeader, "test-arm-client-request-id")
-		req.Header.Set(RequestGraphClientRequestIDHeader, "test-graph-client-request-id")
 		req.Header.Set(RequestClientSessionIDHeader, "test-client-session-id")
-		req.Header.Set(RequestClientApplicationIDHeader, "test-client-application-id")
-		req.Header.Set(RequestClientPrincipalNameHeader, "test-client-principal-name")
 
 		router.ServeHTTP(recorder, req)
 
@@ -78,10 +60,7 @@ var _ = Describe("OperationID Middleware", func() {
 		Expect(recorder.Body.String()).To(Equal(
 			"test-correlation-id," +
 				"test-arm-client-request-id," +
-				"test-graph-client-request-id," +
-				"test-client-session-id," +
-				"test-client-application-id," +
-				"test-client-principal-name",
+				"test-client-session-id",
 		))
 	})
 
@@ -91,7 +70,7 @@ var _ = Describe("OperationID Middleware", func() {
 		router.ServeHTTP(recorder, req)
 
 		Expect(recorder.Code).To(Equal(http.StatusOK))
-		Expect(recorder.Body.String()).To(Equal(",,,,,"))
+		Expect(recorder.Body.String()).To(Equal(",,"))
 	})
 
 	It("should extract custom headers with a custom extractor", func() {
@@ -108,7 +87,7 @@ var _ = Describe("OperationID Middleware", func() {
 
 		// Set up a new router with the custom extractor
 		customRouter := mux.NewRouter()
-		customRouter.Use(NewOperationIDMiddlewareWithExtractor(customExtractor))
+		customRouter.Use(NewRequestIDMiddlewareWithExtractor(customExtractor))
 		customRouter.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 			md, ok := metadata.FromIncomingContext(ctx)

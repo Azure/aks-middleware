@@ -1,4 +1,4 @@
-package operationid
+package requestid
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestOperationID(t *testing.T) {
+func TestRequestID(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "OperationID Suite")
+	RunSpecs(t, "RequestID Suite")
 }

@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"time"
 
-	"github.com/Azure/aks-middleware/httpmw/operationid"
+	"github.com/Azure/aks-middleware/httpmw/requestid"
 	"github.com/gorilla/mux"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -33,11 +33,11 @@ var _ = Describe("Httpmw", func() {
 
 		customExtractor := func(r *http.Request) map[string]string {
 			return map[string]string{
-				string(operationid.CorrelationIDKey): r.Header.Get(operationid.RequestCorrelationIDHeader),
-				"acsoperationID":                     r.Header.Get(RequestAcsOperationIDHeader),
+				string(requestid.CorrelationIDKey): r.Header.Get(requestid.RequestCorrelationIDHeader),
+				"acsoperationID":                   r.Header.Get(RequestAcsOperationIDHeader),
 			}
 		}
-		router.Use(operationid.NewOperationIDMiddlewareWithExtractor(customExtractor))
+		router.Use(requestid.NewRequestIDMiddlewareWithExtractor(customExtractor))
 		router.Use(NewLogging(slogLogger))
 
 		router.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
@@ -57,7 +57,7 @@ var _ = Describe("Httpmw", func() {
 			Expect(buf.String()).To(ContainSubstring(`"source":"ApiRequestLog"`))
 			Expect(buf.String()).To(ContainSubstring(`"protocol":"HTTP"`))
 			Expect(buf.String()).To(ContainSubstring(`"method_type":"unary"`))
-			Expect(buf.String()).To(ContainSubstring(`"component":"client"`))
+			Expect(buf.String()).To(ContainSubstring(`"component":"server"`))
 			Expect(buf.String()).To(ContainSubstring(`"time_ms":`))
 			Expect(buf.String()).To(ContainSubstring(`"service":"`))
 			Expect(buf.String()).To(ContainSubstring(`"url":"`))
@@ -68,7 +68,7 @@ var _ = Describe("Httpmw", func() {
 			w := httptest.NewRecorder()
 			req := httptest.NewRequest("GET", "/", nil)
 			req.Header.Set(RequestAcsOperationIDHeader, "test-operation-id")
-			req.Header.Set(operationid.RequestCorrelationIDHeader, "test-correlation-id")
+			req.Header.Set(requestid.RequestCorrelationIDHeader, "test-correlation-id")
 
 			router.ServeHTTP(w, req)
 

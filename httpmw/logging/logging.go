@@ -71,19 +71,22 @@ func (l *loggingMiddleware) LogRequestStart(ctx context.Context, r *http.Request
 		"source", "ApiRequestLog",
 		"protocol", "HTTP",
 		"method_type", "unary",
-		"component", "client",
+		"component", "server",
 		"method", r.Method,
 		"service", r.Host,
 		"url", r.URL.String(),
 	}
 
+	headers := make(map[string]string)
 	if ok {
 		for key, values := range md {
-			for _, value := range values {
-				attributes = append(attributes, key, value)
+			if len(values) > 0 {
+				headers[key] = values[0]
 			}
 		}
 	}
+
+	attributes = append(attributes, "headers", headers)
 
 	l.logger.InfoContext(ctx, "RequestStart", attributes...)
 }
@@ -94,7 +97,7 @@ func (l *loggingMiddleware) LogRequestEnd(ctx context.Context, r *http.Request, 
 		"source", "ApiRequestLog",
 		"protocol", "HTTP",
 		"method_type", "unary",
-		"component", "client",
+		"component", "server",
 		"method", r.Method,
 		"service", r.Host,
 		"url", r.URL.String(),
@@ -102,13 +105,16 @@ func (l *loggingMiddleware) LogRequestEnd(ctx context.Context, r *http.Request, 
 		"time_ms", duration.Milliseconds(),
 	}
 
+	headers := make(map[string]string)
 	if ok {
 		for key, values := range md {
-			for _, value := range values {
-				attributes = append(attributes, key, value)
+			if len(values) > 0 {
+				headers[key] = values[0]
 			}
 		}
 	}
+
+	attributes = append(attributes, "headers", headers)
 
 	l.logger.InfoContext(ctx, msg, attributes...)
 }
