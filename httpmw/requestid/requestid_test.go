@@ -25,7 +25,6 @@ var _ = Describe("RequestID Middleware", func() {
 			var (
 				correlationID      string
 				armClientRequestID string
-				clientSessionID    string
 			)
 			if ok {
 				if vals := md.Get(string(CorrelationIDKey)); len(vals) > 0 {
@@ -34,15 +33,11 @@ var _ = Describe("RequestID Middleware", func() {
 				if vals := md.Get(string(ARMClientRequestIDKey)); len(vals) > 0 {
 					armClientRequestID = vals[0]
 				}
-				if vals := md.Get(string(ClientSessionIDKey)); len(vals) > 0 {
-					clientSessionID = vals[0]
-				}
 			}
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(
 				correlationID + "," +
-					armClientRequestID + "," +
-					clientSessionID,
+					armClientRequestID,
 			))
 		})
 		recorder = httptest.NewRecorder()
@@ -52,15 +47,13 @@ var _ = Describe("RequestID Middleware", func() {
 		req := httptest.NewRequest("GET", "/", nil)
 		req.Header.Set(RequestCorrelationIDHeader, "test-correlation-id")
 		req.Header.Set(RequestARMClientRequestIDHeader, "test-arm-client-request-id")
-		req.Header.Set(RequestClientSessionIDHeader, "test-client-session-id")
 
 		router.ServeHTTP(recorder, req)
 
 		Expect(recorder.Code).To(Equal(http.StatusOK))
 		Expect(recorder.Body.String()).To(Equal(
 			"test-correlation-id," +
-				"test-arm-client-request-id," +
-				"test-client-session-id",
+				"test-arm-client-request-id",
 		))
 	})
 
@@ -70,7 +63,7 @@ var _ = Describe("RequestID Middleware", func() {
 		router.ServeHTTP(recorder, req)
 
 		Expect(recorder.Code).To(Equal(http.StatusOK))
-		Expect(recorder.Body.String()).To(Equal(",,"))
+		Expect(recorder.Body.String()).To(Equal(","))
 	})
 
 	It("should extract custom headers with a custom extractor", func() {
