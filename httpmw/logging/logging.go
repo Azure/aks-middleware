@@ -1,11 +1,13 @@
 package logging
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/gorilla/mux"
+	"google.golang.org/grpc/metadata"
 )
 
 // TODO (Tom): Add a logger wrapper in its own package
@@ -52,22 +54,49 @@ func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	customWriter := &responseWriter{ResponseWriter: w}
 
 	startTime := l.now()
-	l.LogRequestStart(r)
-	l.next.ServeHTTP(customWriter, r)
+	ctx := r.Context()
+
+	l.LogRequestStart(ctx, r, "RequestStart")
+	l.next.ServeHTTP(customWriter, r.WithContext(ctx))
 	endTime := l.now()
 
 	latency := endTime.Sub(startTime)
-	l.LogRequestEnd(r, "RequestEnd", customWriter.statusCode, latency)
-	l.LogRequestEnd(r, "finished call", customWriter.statusCode, latency)
+	l.LogRequestEnd(ctx, r, "RequestEnd", customWriter.statusCode, latency)
+	l.LogRequestEnd(ctx, r, "finished call", customWriter.statusCode, latency)
 }
 
-func (l *loggingMiddleware) LogRequestStart(r *http.Request) {
-	l.logger.Info("RequestStart", "source", "ApiRequestLog", "protocol", "HTTP", "method_type", "unary",
-		"component", "client", "method", r.Method, "service", r.Host, "url", r.URL.String())
+func (l *loggingMiddleware) buildAttributes(ctx context.Context, r *http.Request, extra ...interface{}) []interface{} {
+	md, ok := metadata.FromIncomingContext(ctx)
+	attributes := []interface{}{
+		"source", "ApiRequestLog",
+		"protocol", "HTTP",
+		"method_type", "unary",
+		"component", "server",
+		"method", r.Method,
+		"service", r.Host,
+		"url", r.URL.String(),
+	}
+
+	headers := make(map[string]string)
+	if ok {
+		for key, values := range md {
+			if len(values) > 0 {
+				headers[key] = values[0]
+			}
+		}
+	}
+
+	attributes = append(attributes, "headers", headers)
+	attributes = append(attributes, extra...)
+	return attributes
 }
 
-func (l *loggingMiddleware) LogRequestEnd(r *http.Request, msg string, statusCode int, duration time.Duration) {
-	l.logger.Info(msg, "source", "ApiRequestLog", "protocol", "HTTP", "method_type",
-		"unary", "component", "client", "method", r.Method, "service", r.Host,
-		"url", r.URL.String(), "code", statusCode, "time_ms", duration.Milliseconds())
+func (l *loggingMiddleware) LogRequestStart(ctx context.Context, r *http.Request, msg string) {
+	attributes := l.buildAttributes(ctx, r)
+	l.logger.InfoContext(ctx, msg, attributes...)
+}
+
+func (l *loggingMiddleware) LogRequestEnd(ctx context.Context, r *http.Request, msg string, statusCode int, duration time.Duration) {
+	attributes := l.buildAttributes(ctx, r, "code", statusCode, "time_ms", duration.Milliseconds())
+	l.logger.InfoContext(ctx, msg, attributes...)
 }
