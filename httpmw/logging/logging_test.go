@@ -20,10 +20,6 @@ var _ = Describe("Httpmw", func() {
 		slogLogger *slog.Logger
 	)
 
-	const (
-		RequestAcsOperationIDHeader = "x-ms-acs-operation-id"
-	)
-
 	BeforeEach(func() {
 
 		buf = new(bytes.Buffer)
@@ -34,7 +30,7 @@ var _ = Describe("Httpmw", func() {
 		customExtractor := func(r *http.Request) map[string]string {
 			return map[string]string{
 				string(requestid.CorrelationIDKey): r.Header.Get(requestid.RequestCorrelationIDHeader),
-				"acsoperationID":                   r.Header.Get(RequestAcsOperationIDHeader),
+				string(requestid.OperationIDKey):   r.Header.Get(requestid.RequestAcsOperationIDHeader),
 			}
 		}
 		router.Use(requestid.NewRequestIDMiddlewareWithExtractor(customExtractor))
@@ -67,13 +63,14 @@ var _ = Describe("Httpmw", func() {
 		It("should log operationID and correlationID from headers", func() {
 			w := httptest.NewRecorder()
 			req := httptest.NewRequest("GET", "/", nil)
-			req.Header.Set(RequestAcsOperationIDHeader, "test-operation-id")
+			req.Header.Set(requestid.RequestAcsOperationIDHeader, "test-operation-id")
 			req.Header.Set(requestid.RequestCorrelationIDHeader, "test-correlation-id")
 
 			router.ServeHTTP(w, req)
 
-			Expect(buf.String()).To(ContainSubstring(`"acsoperationid":"test-operation-id"`))
+			Expect(buf.String()).To(ContainSubstring(`"operationid":"test-operation-id"`))
 			Expect(buf.String()).To(ContainSubstring(`"correlationid":"test-correlation-id"`))
+			Expect(buf.String()).ToNot(ContainSubstring(`"armclientrequestid"`))
 			Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
 		})
 	})

@@ -24,11 +24,15 @@ var _ = Describe("RequestID Middleware", func() {
 			md, ok := metadata.FromIncomingContext(ctx)
 			var (
 				correlationID      string
+				operationID        string
 				armClientRequestID string
 			)
 			if ok {
 				if vals := md.Get(string(CorrelationIDKey)); len(vals) > 0 {
 					correlationID = vals[0]
+				}
+				if vals := md.Get(string(OperationIDKey)); len(vals) > 0 {
+					operationID = vals[0]
 				}
 				if vals := md.Get(string(ARMClientRequestIDKey)); len(vals) > 0 {
 					armClientRequestID = vals[0]
@@ -37,6 +41,7 @@ var _ = Describe("RequestID Middleware", func() {
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(
 				correlationID + "," +
+					operationID + "," +
 					armClientRequestID,
 			))
 		})
@@ -46,6 +51,7 @@ var _ = Describe("RequestID Middleware", func() {
 	It("should extract all default headers", func() {
 		req := httptest.NewRequest("GET", "/", nil)
 		req.Header.Set(RequestCorrelationIDHeader, "test-correlation-id")
+		req.Header.Set(RequestAcsOperationIDHeader, "test-operation-id")
 		req.Header.Set(RequestARMClientRequestIDHeader, "test-arm-client-request-id")
 
 		router.ServeHTTP(recorder, req)
@@ -53,6 +59,7 @@ var _ = Describe("RequestID Middleware", func() {
 		Expect(recorder.Code).To(Equal(http.StatusOK))
 		Expect(recorder.Body.String()).To(Equal(
 			"test-correlation-id," +
+				"test-operation-id," +
 				"test-arm-client-request-id",
 		))
 	})
@@ -63,18 +70,18 @@ var _ = Describe("RequestID Middleware", func() {
 		router.ServeHTTP(recorder, req)
 
 		Expect(recorder.Code).To(Equal(http.StatusOK))
-		Expect(recorder.Body.String()).To(Equal(","))
+		Expect(recorder.Body.String()).To(Equal(",,"))
 	})
 
 	It("should extract custom headers with a custom extractor", func() {
 		const (
-			RequestAcsOperationIDHeader = "x-ms-acs-operation-id"
+			RequestCustomHeader = "x-ms-custom-id"
 		)
 
 		customExtractor := func(r *http.Request) map[string]string {
 			return map[string]string{
 				string(CorrelationIDKey): r.Header.Get(RequestCorrelationIDHeader),
-				"acsOperationID":         r.Header.Get(RequestAcsOperationIDHeader),
+				"customID":               r.Header.Get(RequestCustomHeader),
 			}
 		}
 
@@ -85,21 +92,21 @@ var _ = Describe("RequestID Middleware", func() {
 			ctx := r.Context()
 			md, ok := metadata.FromIncomingContext(ctx)
 			var (
-				correlationID  string
-				acsOperationID string
+				correlationID string
+				customID      string
 			)
 			if ok {
 				if vals := md.Get(string(CorrelationIDKey)); len(vals) > 0 {
 					correlationID = vals[0]
 				}
-				if vals := md.Get("acsOperationID"); len(vals) > 0 {
-					acsOperationID = vals[0]
+				if vals := md.Get("customID"); len(vals) > 0 {
+					customID = vals[0]
 				}
 			}
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(
 				correlationID + "," +
-					acsOperationID,
+					customID,
 			))
 		})
 		customRecorder := httptest.NewRecorder()
@@ -107,13 +114,13 @@ var _ = Describe("RequestID Middleware", func() {
 		// Create a request with custom headers
 		req := httptest.NewRequest("GET", "/", nil)
 		req.Header.Set(RequestCorrelationIDHeader, "custom-correlation-id")
-		req.Header.Set(RequestAcsOperationIDHeader, "custom-acs-operation-id")
+		req.Header.Set(RequestCustomHeader, "test-custom-id")
 
 		customRouter.ServeHTTP(customRecorder, req)
 
 		Expect(customRecorder.Code).To(Equal(http.StatusOK))
 		Expect(customRecorder.Body.String()).To(Equal(
-			"custom-correlation-id,custom-acs-operation-id",
+			"custom-correlation-id,test-custom-id",
 		))
 	})
 })
