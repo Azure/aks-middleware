@@ -65,7 +65,7 @@ func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	l.LogRequestEnd(ctx, r, "finished call", customWriter.statusCode, latency)
 }
 
-func (l *loggingMiddleware) buildAttributes(ctx context.Context, r *http.Request, extra ...interface{}) []interface{} {
+func BuildAttributes(ctx context.Context, r *http.Request, extra ...interface{}) []interface{} {
 	md, ok := metadata.FromIncomingContext(ctx)
 	attributes := []interface{}{
 		"source", "ApiRequestLog",
@@ -92,11 +92,11 @@ func (l *loggingMiddleware) buildAttributes(ctx context.Context, r *http.Request
 }
 
 func (l *loggingMiddleware) LogRequestStart(ctx context.Context, r *http.Request, msg string) {
-	attributes := l.buildAttributes(ctx, r)
+	attributes := BuildAttributes(ctx, r)
 	l.logger.InfoContext(ctx, msg, attributes...)
 }
 
 func (l *loggingMiddleware) LogRequestEnd(ctx context.Context, r *http.Request, msg string, statusCode int, duration time.Duration) {
-	attributes := l.buildAttributes(ctx, r, "code", statusCode, "time_ms", duration.Milliseconds())
+	attributes := BuildAttributes(ctx, r, "code", statusCode, "time_ms", duration.Milliseconds())
 	l.logger.InfoContext(ctx, msg, attributes...)
 }
