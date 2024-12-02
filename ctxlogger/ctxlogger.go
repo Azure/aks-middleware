@@ -5,7 +5,7 @@ import (
 
 	"encoding/json"
 
-	"github.com/Azure/aks-middleware/requestid"
+	"github.com/Azure/aks-middleware/autologger"
 
 	log "log/slog"
 
@@ -75,7 +75,7 @@ const (
 func defaultExtractFunction(ctx context.Context, req any, info *grpc.UnaryServerInfo, logger *log.Logger) *log.Logger {
 	l := logger
 	l = l.With(methodLogKey, info.FullMethod)
-	l = l.With(requestid.RequestIDLogKey, requestid.GetRequestHeaders(ctx))
+	l = l.With(autologger.GetFields(ctx)...)
 	return l
 }
 

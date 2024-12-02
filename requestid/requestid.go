@@ -14,13 +14,6 @@ import (
 
 // Derived from https://github.com/goadesign/goa/blob/v3/grpc/middleware/requestid.go#L31
 
-const (
-	// RequestIDMetadataKey is the key in the gRPC
-	// metadata.
-	RequestIDMetadataKey = "x-request-id"
-	RequestIDLogKey      = "request-id"
-)
-
 // UnaryServerInterceptor returns a server interceptor
 // that add a request ID to the incoming metadata if there is none.
 func UnaryServerInterceptor() grpc.UnaryServerInterceptor {
@@ -37,10 +30,10 @@ func generateRequestID(ctx context.Context) context.Context {
 	if !ok {
 		md = metadata.MD{}
 	}
-	if vals := md.Get(RequestIDMetadataKey); len(vals) > 0 {
+	if vals := md.Get(common.RequestIDMetadataKey); len(vals) > 0 {
 		return ctx
 	}
-	md.Set(RequestIDMetadataKey, shortID())
+	md.Set(common.RequestIDMetadataKey, shortID())
 	return metadata.NewIncomingContext(ctx, md)
 
 }
@@ -51,21 +44,21 @@ func shortID() string {
 	return base64.RawURLEncoding.EncodeToString(b)
 }
 
-func GetRequestHeaders(ctx context.Context) map[string]string {
-	headers := make(map[string]string)
+func GetMetadata(ctx context.Context) map[string]string {
+	headersFromMD := make(map[string]string)
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
-		return headers
+		return headersFromMD
 	}
 	for _, key := range []string{
-		RequestIDMetadataKey,
+		common.RequestIDMetadataKey,
 		common.CorrelationIDKey,
 		common.OperationIDKey,
 		common.ARMClientRequestIDKey,
 	} {
 		if vals := md.Get(key); len(vals) > 0 {
-			headers[key] = vals[0]
+			headersFromMD[key] = vals[0]
 		}
 	}
-	return headers
+	return headersFromMD
 }

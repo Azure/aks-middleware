@@ -9,6 +9,7 @@ import (
 
 	log "log/slog"
 
+	"github.com/Azure/aks-middleware/common"
 	"github.com/Azure/aks-middleware/requestid"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
@@ -48,12 +49,12 @@ func InterceptorLogger(logger *log.Logger) logging.Logger {
 
 // Add request-id & headers to API autologger.
 func GetFields(ctx context.Context) logging.Fields {
-	headers := requestid.GetRequestHeaders(ctx)
-	requestID := headers[requestid.RequestIDMetadataKey]
+	headers := requestid.GetMetadata(ctx)
+	requestID := headers[common.RequestIDMetadataKey]
 	// Remove the main request ID from headers map since it's logged separately
-	delete(headers, requestid.RequestIDMetadataKey)
+	delete(headers, common.RequestIDMetadataKey)
 	return logging.Fields{
-		requestid.RequestIDLogKey, requestID,
+		common.RequestIDLogKey, requestID,
 		"headers", headers,
 	}
 }
