@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/aks-middleware/common"
 	azcorePolicy "github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 )
 
@@ -114,6 +115,9 @@ func LogRequest(params LogRequestParams) {
 
 	methodInfo := getMethodInfo(method, reqURL)
 	latency := time.Since(params.StartTime).Milliseconds()
+
+	headers := extractHeaders(params.Response.Header)
+
 	logEntry := params.Logger.With(
 		"source", "ApiRequestLog",
 		"protocol", "REST",
@@ -123,6 +127,7 @@ func LogRequest(params LogRequestParams) {
 		"method", methodInfo,
 		"service", service,
 		"url", reqURL,
+		"headers", headers,
 	)
 
 	if params.Error != nil || params.Response == nil {
@@ -132,4 +137,23 @@ func LogRequest(params LogRequestParams) {
 	} else {
 		logEntry.With("error", params.Response.Status, "code", params.Response.StatusCode).Error("finished call")
 	}
+}
+
+func extractHeaders(header http.Header) map[string]string {
+	headers := make(map[string]string)
+
+	// List of headers to extract
+	headerKeys := []string{
+		common.RequestCorrelationIDHeader,
+		common.RequestAcsOperationIDHeader,
+		common.RequestARMClientRequestIDHeader,
+	}
+
+	for _, key := range headerKeys {
+		if values, ok := header[key]; ok && len(values) > 0 {
+			headers[key] = values[0]
+		}
+	}
+
+	return headers
 }

@@ -46,9 +46,14 @@ func InterceptorLogger(logger *log.Logger) logging.Logger {
 	})
 }
 
-// Add request-id to API autologger.
+// Add request-id & headers to API autologger.
 func GetFields(ctx context.Context) logging.Fields {
+	headers := requestid.GetRequestHeaders(ctx)
+	requestID := headers[requestid.RequestIDMetadataKey]
+	// Remove the main request ID from headers map since it's logged separately
+	delete(headers, requestid.RequestIDMetadataKey)
 	return logging.Fields{
-		requestid.RequestIDLogKey, requestid.GetRequestID(ctx),
+		requestid.RequestIDLogKey, requestID,
+		"headers", headers,
 	}
 }

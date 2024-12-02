@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"io"
 
+	"github.com/Azure/aks-middleware/common"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 )
@@ -50,14 +51,21 @@ func shortID() string {
 	return base64.RawURLEncoding.EncodeToString(b)
 }
 
-func GetRequestID(ctx context.Context) string {
-	requestID := ""
+func GetRequestHeaders(ctx context.Context) map[string]string {
+	headers := make(map[string]string)
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
-		return requestID
+		return headers
 	}
-	if vals := md.Get(RequestIDMetadataKey); len(vals) > 0 {
-		return vals[0]
+	for _, key := range []string{
+		RequestIDMetadataKey,
+		common.CorrelationIDKey,
+		common.OperationIDKey,
+		common.ARMClientRequestIDKey,
+	} {
+		if vals := md.Get(key); len(vals) > 0 {
+			headers[key] = vals[0]
+		}
 	}
-	return requestID
+	return headers
 }

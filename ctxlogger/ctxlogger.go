@@ -75,7 +75,7 @@ const (
 func defaultExtractFunction(ctx context.Context, req any, info *grpc.UnaryServerInfo, logger *log.Logger) *log.Logger {
 	l := logger
 	l = l.With(methodLogKey, info.FullMethod)
-	l = l.With(requestid.RequestIDLogKey, requestid.GetRequestID(ctx))
+	l = l.With(requestid.RequestIDLogKey, requestid.GetRequestHeaders(ctx))
 	return l
 }
 
