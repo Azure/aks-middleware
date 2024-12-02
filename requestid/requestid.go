@@ -43,22 +43,3 @@ func shortID() string {
 	io.ReadFull(rand.Reader, b)
 	return base64.RawURLEncoding.EncodeToString(b)
 }
-
-func GetMetadata(ctx context.Context) map[string]string {
-	headersFromMD := make(map[string]string)
-	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
-		return headersFromMD
-	}
-	for _, key := range []string{
-		common.RequestIDMetadataKey,
-		common.CorrelationIDKey,
-		common.OperationIDKey,
-		common.ARMClientRequestIDKey,
-	} {
-		if vals := md.Get(key); len(vals) > 0 {
-			headersFromMD[key] = vals[0]
-		}
-	}
-	return headersFromMD
-}
