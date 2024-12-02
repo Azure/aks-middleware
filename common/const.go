@@ -1,9 +1,9 @@
 package common
 
 const (
-	CorrelationIDKey      = "correlationID"
-	OperationIDKey        = "operationID"
-	ARMClientRequestIDKey = "armClientRequestID"
+	CorrelationIDKey      = "correlationid"
+	OperationIDKey        = "operationid"
+	ARMClientRequestIDKey = "armclientrequestid"
 	RequestIDLogKey       = "request-id"
 
 	// Details can be found here:

@@ -149,8 +149,15 @@ func extractHeaders(header http.Header) map[string]string {
 		common.RequestARMClientRequestIDHeader,
 	}
 
+	// Convert header keys to lowercase
+	lowerHeader := make(http.Header)
+	for key, values := range header {
+		lowerHeader[strings.ToLower(key)] = values
+	}
+
 	for _, key := range headerKeys {
-		if values, ok := header[key]; ok && len(values) > 0 {
+		lowerKey := strings.ToLower(key)
+		if values, ok := lowerHeader[lowerKey]; ok && len(values) > 0 {
 			headers[key] = values[0]
 		}
 	}
