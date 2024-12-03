@@ -15,5 +15,5 @@ const (
 	RequestARMClientRequestIDHeader = "x-ms-client-request-id"
 	// RequestIDMetadataKey is the key in the gRPC
 	// metadata.
-	RequestIDMetadataKey = "x-request-id"
+	RequestIDMetadataHeader = "x-request-id"
 )

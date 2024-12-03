@@ -7,25 +7,22 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
+// GetFields returns a logging.Fields object with the request ID and headers
 func GetFields(ctx context.Context) logging.Fields {
-	headers := GetMetadata(ctx)
-	requestID := headers[RequestIDMetadataKey]
-	// Remove the main request ID from headers map since it's logged separately
-	delete(headers, RequestIDMetadataKey)
+	headers := getMetadata(ctx)
 	return logging.Fields{
-		RequestIDLogKey, requestID,
 		"headers", headers,
 	}
 }
 
-func GetMetadata(ctx context.Context) map[string]string {
+func getMetadata(ctx context.Context) map[string]string {
 	headersFromMD := make(map[string]string)
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
 		return headersFromMD
 	}
 	for _, key := range []string{
-		RequestIDMetadataKey,
+		RequestIDMetadataHeader,
 		CorrelationIDKey,
 		OperationIDKey,
 		ARMClientRequestIDKey,

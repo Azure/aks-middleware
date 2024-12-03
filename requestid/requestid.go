@@ -30,10 +30,10 @@ func generateRequestID(ctx context.Context) context.Context {
 	if !ok {
 		md = metadata.MD{}
 	}
-	if vals := md.Get(common.RequestIDMetadataKey); len(vals) > 0 {
+	if vals := md.Get(common.RequestIDMetadataHeader); len(vals) > 0 {
 		return ctx
 	}
-	md.Set(common.RequestIDMetadataKey, shortID())
+	md.Set(common.RequestIDMetadataHeader, shortID())
 	return metadata.NewIncomingContext(ctx, md)
 
 }
