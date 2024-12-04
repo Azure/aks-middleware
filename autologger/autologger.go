@@ -9,8 +9,6 @@ import (
 
 	log "log/slog"
 
-	"github.com/Azure/aks-middleware/requestid"
-
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 )
 
@@ -44,11 +42,4 @@ func InterceptorLogger(logger *log.Logger) logging.Logger {
 			panic(fmt.Sprintf("unknown level %v", lvl))
 		}
 	})
-}
-
-// Add request-id to API autologger.
-func GetFields(ctx context.Context) logging.Fields {
-	return logging.Fields{
-		requestid.RequestIDLogKey, requestid.GetRequestID(ctx),
-	}
 }

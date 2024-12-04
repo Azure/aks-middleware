@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/Azure/aks-middleware/autologger"
+	"github.com/Azure/aks-middleware/common"
 	"github.com/Azure/aks-middleware/ctxlogger"
 	"github.com/Azure/aks-middleware/mdforward"
 	"github.com/Azure/aks-middleware/requestid"
@@ -79,7 +80,7 @@ func DefaultClientInterceptors(options ClientInterceptorLogOptions) []grpc.Unary
 			autologger.InterceptorLogger(apiRequestLogger),
 			logging.WithLogOnEvents(logging.FinishCall),
 			logging.WithLevels(logging.DefaultServerCodeToLevel),
-			logging.WithFieldsFromContext(autologger.GetFields),
+			logging.WithFieldsFromContext(common.GetFields),
 		),
 	}
 }
@@ -140,7 +141,7 @@ func DefaultServerInterceptors(options ServerInterceptorLogOptions) []grpc.Unary
 		logging.UnaryServerInterceptor(
 			autologger.InterceptorLogger(apiRequestLogger),
 			logging.WithLogOnEvents(logging.FinishCall),
-			logging.WithFieldsFromContext(autologger.GetFields),
+			logging.WithFieldsFromContext(common.GetFields),
 		),
 		recovery.UnaryServerInterceptor(GetRecoveryOpts()...),
 	}

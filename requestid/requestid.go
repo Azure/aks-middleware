@@ -7,18 +7,12 @@ import (
 	"encoding/base64"
 	"io"
 
+	"github.com/Azure/aks-middleware/common"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 )
 
 // Derived from https://github.com/goadesign/goa/blob/v3/grpc/middleware/requestid.go#L31
-
-const (
-	// RequestIDMetadataKey is the key in the gRPC
-	// metadata.
-	RequestIDMetadataKey = "x-request-id"
-	RequestIDLogKey      = "request-id"
-)
 
 // UnaryServerInterceptor returns a server interceptor
 // that add a request ID to the incoming metadata if there is none.
@@ -36,10 +30,10 @@ func generateRequestID(ctx context.Context) context.Context {
 	if !ok {
 		md = metadata.MD{}
 	}
-	if vals := md.Get(RequestIDMetadataKey); len(vals) > 0 {
+	if vals := md.Get(common.RequestIDMetadataHeader); len(vals) > 0 {
 		return ctx
 	}
-	md.Set(RequestIDMetadataKey, shortID())
+	md.Set(common.RequestIDMetadataHeader, shortID())
 	return metadata.NewIncomingContext(ctx, md)
 
 }
@@ -48,16 +42,4 @@ func shortID() string {
 	b := make([]byte, 6)
 	io.ReadFull(rand.Reader, b)
 	return base64.RawURLEncoding.EncodeToString(b)
-}
-
-func GetRequestID(ctx context.Context) string {
-	requestID := ""
-	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
-		return requestID
-	}
-	if vals := md.Get(RequestIDMetadataKey); len(vals) > 0 {
-		return vals[0]
-	}
-	return requestID
 }

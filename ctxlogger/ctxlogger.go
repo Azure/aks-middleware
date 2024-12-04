@@ -5,11 +5,10 @@ import (
 
 	"encoding/json"
 
-	"github.com/Azure/aks-middleware/requestid"
-
 	log "log/slog"
 
 	loggable "buf.build/gen/go/service-hub/loggable/protocolbuffers/go/proto"
+	"github.com/Azure/aks-middleware/common"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -75,7 +74,7 @@ const (
 func defaultExtractFunction(ctx context.Context, req any, info *grpc.UnaryServerInfo, logger *log.Logger) *log.Logger {
 	l := logger
 	l = l.With(methodLogKey, info.FullMethod)
-	l = l.With(requestid.RequestIDLogKey, requestid.GetRequestID(ctx))
+	l = l.With(common.GetFields(ctx)...)
 	return l
 }
 
