@@ -116,7 +116,10 @@ func LogRequest(params LogRequestParams) {
 	methodInfo := getMethodInfo(method, reqURL)
 	latency := time.Since(params.StartTime).Milliseconds()
 
-	headers := extractHeaders(params.Response.Header)
+	var headers map[string]string
+	if params.Response != nil {
+		headers = extractHeaders(params.Response.Header)
+	}
 
 	logEntry := params.Logger.With(
 		"source", "ApiRequestLog",
