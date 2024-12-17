@@ -7,6 +7,7 @@ import (
 	"github.com/Azure/aks-middleware/autologger"
 	"github.com/Azure/aks-middleware/common"
 	"github.com/Azure/aks-middleware/ctxlogger"
+	"github.com/Azure/aks-middleware/mdcopy"
 	"github.com/Azure/aks-middleware/mdforward"
 	"github.com/Azure/aks-middleware/requestid"
 
@@ -143,6 +144,7 @@ func DefaultServerInterceptors(options ServerInterceptorLogOptions) []grpc.Unary
 			logging.WithLogOnEvents(logging.FinishCall),
 			logging.WithFieldsFromContext(common.GetFields),
 		),
+		mdcopy.UnaryServerInterceptor(),
 		recovery.UnaryServerInterceptor(GetRecoveryOpts()...),
 	}
 }
