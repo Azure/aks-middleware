@@ -118,7 +118,7 @@ The `httpmw` folder contains middleware for HTTP servers built using the `gorill
 
 ### 4.1. <a name='requestid-1'></a>requestid
 
-It extract Azure Resource Manager required HTTP headers from the request and put them as metadata of the incoming context.
+It extracts Azure Resource Manager required HTTP headers from the request and put them as metadata of the incoming context.
 
 The current implementation is not consistent with its gRPC counterpart.
 
