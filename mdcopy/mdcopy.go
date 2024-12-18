@@ -28,7 +28,7 @@ func copyMetadata(ctx context.Context) error {
 		fmt.Println("No incoming metadata found")
 		return nil
 	}
-	// Set the outgoing header metadata
+	// Set the response header metadata
 	if err := grpc.SetHeader(ctx, md); err != nil {
 		return err
 	}
