@@ -56,7 +56,7 @@ ServerInterceptor. It adds x-request-id to MD if there is no such entry. This in
 
 ### 2.2. <a name='ctxloggerapplogger'></a>ctxlogger (applogger)
 
-ServerInterceptor. It adds a logger to ctx with important information (e.g., request-id, method-name) already poplulated. App's handler code can get the logger and output additional information. Needs to be registered after the requestid interceptor.
+ServerInterceptor. It adds a logger to ctx with important information (e.g., request-id, method-name) already populated. App's handler code can get the logger and output additional information. Needs to be registered after the requestid interceptor.
 
 Only information in MD could be propagated to dependencies. The logger added via ctx.WithValue() is local to the ctx and won't be propagated to dependencies.
 
