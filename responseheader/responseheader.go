@@ -26,9 +26,9 @@ func copyMetadata(ctx context.Context, allowedHeaders map[string]string) error {
 
 	// Filter and set the allowed metadata as response headers
 	filteredMD := metadata.New(nil)
-	for key, header := range allowedHeaders {
+	for key := range allowedHeaders {
 		if values, exists := md[key]; exists {
-			filteredMD.Set(header, values...)
+			filteredMD.Set(key, values...)
 		}
 	}
 
