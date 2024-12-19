@@ -40,7 +40,7 @@
 
 This directory is the root of the aks-middleware module. It implements interceptors to aid common service tasks. See the list below for details.
 
-## 1. <a name='Usage'></a>Usage
+## 1. <a id='Usage'></a>Usage
 
 Run the following command in the root directory of this module.
 
@@ -48,19 +48,21 @@ Run the following command in the root directory of this module.
 make
 ```
 
-## 2. <a name='gRPCserver'></a>gRPC server
+## 2. <a id='gRPCserver'></a>gRPC server
 
-### 2.1. <a name='requestid'></a>requestid
+The following gRPC server interceptors are used by default. Some interceptors are implemented in this repo. Some are implemented in existing open source projects and are used by this repo.
 
-ServerInterceptor. It adds x-request-id to MD if there is no such entry. This interceptor needs to be registered first so that its request-id can be used by autologger and applogger.
+### 2.1. <a id='requestid'></a>requestid
 
-### 2.2. <a name='ctxloggerapplogger'></a>ctxlogger (applogger)
+It adds x-request-id to MD if there is no such entry. This interceptor needs to be registered first so that its request-id can be used by autologger and ctxlogger.
 
-ServerInterceptor. It adds a logger to ctx with important information (e.g., request-id, method-name) already populated. App's handler code can get the logger and output additional information. Needs to be registered after the requestid interceptor.
+### 2.2. <a id='ctxloggerapplogger'></a>ctxlogger (applogger)
 
-Only information in MD could be propagated to dependencies. The logger added via ctx.WithValue() is local to the ctx and won't be propagated to dependencies.
+It adds a logger to ctx with important information (e.g., request-id, method-name) already populated. App's handler code can get the logger and output additional information. Needs to be registered after the requestid interceptor.
 
-##### <a name='logfiltering'></a>log filtering
+The logger added via ctx.WithValue() is local to the ctx and won't be propagated to dependencies. Only information in MD could be propagated to dependencies. 
+
+##### <a id='logfiltering'></a>log filtering
 
 This is a feature of ctxlogger that allows the user to annotate within api.proto what request payload variables should be logged or not. Logic in the ctxlogger.go decides what to log based off the annoatation. The "loggable" annotation is true by default, so the user is only required to annotate the variables that should not be logged.
 
@@ -74,127 +76,131 @@ The following gRPC server interceptors are implemented by other open source proj
 
 ---
 
-### 2.3. <a name='autologgerapirequestresponselogger'></a>autologger (api request/response logger)
+### 2.3. <a id='autologgerapirequestresponselogger'></a>autologger (api request/response logger)
 
-This package only provides the default logger implementation to log request result and latency. We use go-grpc-middleware's logging.UnaryServerIncerceptor() and logging.UnaryClientInterceptor() to achieve this. This package is not an interceptor.
+This is to provide the default logger implementation to log incoming request/response result and latency. We use go-grpc-middleware's logging.UnaryServerIncerceptor() to achieve this.
 
-### 2.4. <a name='recovery'></a>recovery
+### 2.4. <a id='recovery'></a>recovery
 
-This is a server side interceptor that is implemented to handle panics in the code
+This is to handle panics in the code.
 
 Once a panic is detected, it is handled by a custom recovery function defined in recoveryOpts.go which logs gRPC code "unknown" along with the file name/line number of where the panic occurred and a link to the repo. The program continues and does not terminate.
 
-### 2.5. <a name='protovalidate'></a>protovalidate
+### 2.5. <a id='protovalidate'></a>protovalidate
 
-This is a server side interceptor that we use to validate the requests that are coming in from the client
+This is to validate the requests from the client.
 
-The validation rules are generated and executed by the protovalidate-go library, and the rules are applied to the variables in the api.proto file
+The validation rules are generated and executed by the protovalidate-go library, and the rules are applied to the variables in the api.proto file.
 
-## 3. <a name='gRPCclient'></a>gRPC client
+## 3. <a id='gRPCclient'></a>gRPC client
 
-### 3.1. <a name='mdforward'></a>mdforward
+The following gRPC client interceptors are used by default.
 
-ClientInterceptor. It propagates MD from incoming to outgoing. Only need to be used in servers. No need to be used in a pure client app.
+### 3.1. <a id='mdforward'></a>mdforward
 
----
-
-The following gRPC client interceptors are implemented by other open source projects. We enabled them in our default client interceptor list. [[return []grpc.UnaryClientInterceptor{](https://github.com/Azure/aks-middleware/blob/afd08e520d5d70f1b24910d26c2a686a0468feaa/interceptor/interceptor.go#L76-L77)
+It propagates MD from incoming to outgoing. Only need to be used in servers that have both incoming requests and outgoing requests. No need to be used in a pure client app that doesn't have incoming requests.
 
 ---
 
-### 3.2. <a name='autologgerapirequestresponselogger-1'></a>autologger (api request/response logger)
+The following gRPC client interceptors are implemented by other open source projects. We enabled them in our default client interceptor list. [return []grpc.UnaryClientInterceptor{](https://github.com/Azure/aks-middleware/blob/afd08e520d5d70f1b24910d26c2a686a0468feaa/interceptor/interceptor.go#L76-L77)
 
-This package only provides the default logger implementation to log request result and latency. We use go-grpc-middleware's logging.UnaryServerIncerceptor() and logging.UnaryClientInterceptor() to achieve this. This package is not an interceptor.
+---
 
-### 3.3. <a name='retry'></a>retry
+### 3.2. <a id='autologgerapirequestresponselogger-1'></a>autologger (api request/response logger)
 
-This is a client interceptor that resends a request based on the gRPC code that is returned from the server
+This package only provides the default logger implementation to log outgoing request/response result and latency. We use go-grpc-middleware's logging.UnaryClientInterceptor() to achieve this.
+
+### 3.3. <a id='retry'></a>retry
+
+It resends a request based on the gRPC code that is returned from the server
 
 All options for the interceptor (i.e. max retries, codes to retry on, type of backoff) are defined in the retryOpts.go file
 
-## 4. <a name='HTTPserver'></a>HTTP server
+## 4. <a id='HTTPserver'></a>HTTP server
 
 The `httpmw` folder contains middleware for HTTP servers built using the `gorilla/mux` package. These are similar to gRPC server interceptors.
 
-### 4.1. <a name='requestid-1'></a>requestid
+### 4.1. <a id='requestid-1'></a>requestid
 
 It extracts Azure Resource Manager required HTTP headers from the request and put them as metadata of the incoming context.
 
 The current implementation is not consistent with its gRPC counterpart.
 
-### 4.2. <a name='ctxloggerapplogger-1'></a>ctxlogger (applogger)
+### 4.2. <a id='ctxloggerapplogger-1'></a>ctxlogger (applogger)
 
 Missing.
 
-### 4.3. <a name='loggingapirequestresponselogger'></a>logging (api request/response logger)
+### 4.3. <a id='loggingapirequestresponselogger'></a>logging (api request/response logger)
 
 The logging middleware logs details about each HTTP request and response, including the request method, URL, status code, and duration.
 
-##### <a name='Usage-1'></a>Usage
+##### <a id='Usage-1'></a>Usage
 
 To use the logging middleware, you need to create a logger and then apply the middleware to your router.
 
 Code example is included in the test code.
 
-### 4.4. <a name='recovery-1'></a>recovery
+### 4.4. <a id='recovery-1'></a>recovery
 
 The recovery middleware recovers from panics in your HTTP handlers and logs the error. It can use a custom panic handler if provided.
 
-##### <a name='Usage-1'></a>Usage
+##### <a id='Usage-1'></a>Usage
 
 To use the recovery middleware, you need to create a logger and apply the middleware to your router. You can also provide a custom panic handler.
 
 Code example is included in the test code
 
-### 4.5. <a name='inputvalidate'></a>inputvalidate
+### 4.5. <a id='inputvalidate'></a>inputvalidate
 
 Missing.
 
-## 5. <a name='HTTPclientviaAzureSDK'></a>HTTP client via Azure SDK
+## 5. <a id='HTTPclientviaAzureSDK'></a>HTTP client via Azure SDK
 
-### 5.1. <a name='mdforward-1'></a>mdforward
+### 5.1. <a id='mdforward-1'></a>mdforward
 
-Missing.
+This is optional. If we choose to implement, we can use the service's operation/correlation id as the request id to Azure. Strictly speaking, it is not metadata forwarding. But it serve the same purpose: instead of propagating the id from the incoming context to the outgoing context, the id is prograted from incoming context to Azure HTTP request header.
 
-### 5.2. <a name='policyapirequestresponselogger'></a>policy (api request/response logger)
+If we choose to not implement it, we can let Azure SDK to decide the request id. The mapping between the Azure request id and the opertion/correlation id will be logged by the policy middleware below.
+
+### 5.2. <a id='policyapirequestresponselogger'></a>policy (api request/response logger)
 
 The `policy` package provides a logging policy for HTTP requests made via the Azure SDK for Go.
 
 The logging policy logs details about each HTTP request and response, including the request method, URL, status code, and duration.
 
-##### <a name='Usage-1'></a>Usage
+##### <a id='Usage-1'></a>Usage
 
 To use the logging policy, you need to create a logger and then apply the policy to your HTTP client.
 
 Code example is included in the test code
 
-### 5.3. <a name='retry-1'></a>retry
+### 5.3. <a id='retry-1'></a>retry
 
 Missing.
 
-## 6. <a name='HTTPclientviaDirectHTTPrequest'></a>HTTP client via Direct HTTP request
+## 6. <a id='HTTPclientviaDirectHTTPrequest'></a>HTTP client via Direct HTTP request
 
-### 6.1. <a name='mdforward-1'></a>mdforward
+### 6.1. <a id='mdforward-1'></a>mdforward
 
 Missing.
 
-### 6.2. <a name='Restloggerapirequestresponselogger'></a>Restlogger (api request/response logger)
+### 6.2. <a id='Restloggerapirequestresponselogger'></a>Restlogger (api request/response logger)
 
 The restlogger package provides a logging round tripper for HTTP clients.
 
 The logging round tripper logs details about each HTTP request and response, including the request method, URL, status code, and duration.
 
-##### <a name='Usage-1'></a>Usage
+##### <a id='Usage-1'></a>Usage
 
 To use the logging round tripper, you need to create a logger and then apply the round tripper to your HTTP client.
 
 Code example is included in the test code
 
-### 6.3. <a name='retry-1'></a>retry
+### 6.3. <a id='retry-1'></a>retry
 
 Missing.
 
-## 7. <a name='Project'></a>Project
+## 7. <a id='Project'></a>Project
 
 > This repo has been populated by an initial template to help get you started. Please
 > make sure to update the content to build a great experience for community-building.
@@ -206,7 +212,7 @@ As the maintainer of this project, please make a few updates:
 - Understanding the security reporting process in SECURITY.MD
 - Remove this section from the README
 
-### 7.1. <a name='Contributing'></a>Contributing
+### 7.1. <a id='Contributing'></a>Contributing
 
 This project welcomes contributions and suggestions.  Most contributions require you to agree to a
 Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us
@@ -220,7 +226,7 @@ This project has adopted the [Microsoft Open Source Code of Conduct](https://ope
 For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or
 contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
 
-### 7.2. <a name='Trademarks'></a>Trademarks
+### 7.2. <a id='Trademarks'></a>Trademarks
 
 This project may contain trademarks or logos for projects, products, or services. Authorized use of Microsoft
 trademarks or logos is subject to and must follow
