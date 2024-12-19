@@ -64,7 +64,7 @@ The logger added via ctx.WithValue() is local to the ctx and won't be propagated
 
 ##### <a id='logfiltering'></a>log filtering
 
-This is a feature of ctxlogger that allows the user to annotate within api.proto what request payload variables should be logged or not. Logic in the ctxlogger.go decides what to log based off the annoatation. The "loggable" annotation is true by default, so the user is only required to annotate the variables that should not be logged.
+This is a feature of ctxlogger that allows the user to annotate within api.proto what request payload variables should be logged or not. Logic in the ctxlogger.go decides what to log based off the annotation. The "loggable" annotation is true by default, so the user is only required to annotate the variables that should not be logged.
 
 Ancestors need to be loggable in order to examine the annotations on the leaf nodes. For example, if loggable value for "address" is false, it will not look for the loggable values of "city", "state", "zipcode", etc.
 
