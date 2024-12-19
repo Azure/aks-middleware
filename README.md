@@ -158,7 +158,7 @@ Missing.
 
 ### 5.1. <a id='mdforward-1'></a>mdforward
 
-This is optional. If we choose to implement, we can use the service's operation/correlation id as the request id to Azure. Strictly speaking, it is not metadata forwarding. But it serve the same purpose: instead of propagating the id from the incoming context to the outgoing context, the id is prograted from incoming context to Azure HTTP request header.
+Strictly speaking, it is not metadata forwarding. But it serves the same purpose: instead of propagating the id from the incoming context to the outgoing context, the id is propagated from incoming context to Azure HTTP request header.
 
 If we choose to not implement it, we can let Azure SDK to decide the request id. The mapping between the Azure request id and the opertion/correlation id will be logged by the policy middleware below.
 
