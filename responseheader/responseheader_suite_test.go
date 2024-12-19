@@ -1,4 +1,4 @@
-package mdcopy_test
+package responseheader_test
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestMdcopy(t *testing.T) {
+func TestResponseheader(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Mdcopy Suite")
+	RunSpecs(t, "Responseheader Suite")
 }
