@@ -39,22 +39,22 @@ var _ = Describe("Metadata", func() {
 	})
 
 	Describe("matchOutgoingHeader", func() {
-		var allowedHeaders map[string]string
+		var allowedMetadataKeys map[string]string
 
 		BeforeEach(func() {
-			allowedHeaders = map[string]string{
+			allowedMetadataKeys = map[string]string{
 				"custom-header": "X-Custom-Header",
 			}
 		})
 
 		It("should match allowed headers", func() {
-			header, ok := matchOutgoingHeader(allowedHeaders, "custom-header")
+			header, ok := matchOutgoingHeader(allowedMetadataKeys, "custom-header")
 			Expect(ok).To(BeTrue())
 			Expect(header).To(Equal("X-Custom-Header"))
 		})
 
 		It("should not match disallowed headers", func() {
-			header, ok := matchOutgoingHeader(allowedHeaders, "other-header")
+			header, ok := matchOutgoingHeader(allowedMetadataKeys, "other-header")
 			Expect(ok).To(BeFalse())
 			Expect(header).To(Equal(""))
 		})
