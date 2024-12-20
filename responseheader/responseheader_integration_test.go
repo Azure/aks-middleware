@@ -26,14 +26,14 @@ var _ = Describe("ResponseHeader Interceptor Integration", func() {
 		lis, err = net.Listen("tcp", "localhost:0") // Listen on a random available port
 		Expect(err).ToNot(HaveOccurred())
 
-		allowedMetadataKeys := map[string]string{
+		metadataToHeader := map[string]string{
 			"custom-header":      "X-Custom-Header",
 			"another-header":     "X-Another-Header",
 			"multi-value-header": "X-Multi-Value-Header",
 			"empty-metadata-key": "",
 		}
 		grpcServer = grpc.NewServer(
-			grpc.UnaryInterceptor(UnaryServerInterceptor(allowedMetadataKeys)),
+			grpc.UnaryInterceptor(UnaryServerInterceptor(metadataToHeader)),
 		)
 		testSrv = &server.TestServer{}
 		pb.RegisterMyGreeterServer(grpcServer, testSrv)

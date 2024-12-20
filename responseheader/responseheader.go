@@ -9,28 +9,30 @@ import (
 
 // UnaryServerInterceptor returns a server interceptor
 // that copies selected request metadata into response metadata.
-func UnaryServerInterceptor(allowedMetadataKeys map[string]string) grpc.UnaryServerInterceptor {
+func UnaryServerInterceptor(metadataToHeader map[string]string) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
-		if err := copyMetadata(ctx, allowedMetadataKeys); err != nil {
+		if err := copyMetadata(ctx, metadataToHeader); err != nil {
 			return nil, err
 		}
 		return handler(ctx, req)
 	}
 }
 
-func copyMetadata(ctx context.Context, allowedMetadataKeys map[string]string) error {
+func copyMetadata(ctx context.Context, metadataToHeader map[string]string) error {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
 		return nil
 	}
 	// Filter and set the allowed metadata as response headers
 	filteredMD := metadata.New(nil)
-	for key := range allowedMetadataKeys {
+	for key := range metadataToHeader {
 		if values, exists := md[key]; exists {
 			filteredMD.Set(key, values...)
 		}
 	}
 
+	// append filteredMD to any existing headers, does not replace the entire header metadata
+	// if setHeader called multiple times, all the provided metadata will be merged
 	if err := grpc.SetHeader(ctx, filteredMD); err != nil {
 		return err
 	}

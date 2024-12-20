@@ -4,7 +4,7 @@
 // - protoc             (unknown)
 // source: api.proto
 
-package test
+package v1
 
 import (
 	context "context"

@@ -10,13 +10,13 @@ import (
 var _ = Describe("Metadata", func() {
 	Describe("extractMetadata", func() {
 		var (
-			headersToMetadata map[string]string
-			req               *http.Request
-			err               error
+			headerToMetadata map[string]string
+			req              *http.Request
+			err              error
 		)
 
 		BeforeEach(func() {
-			headersToMetadata = map[string]string{
+			headerToMetadata = map[string]string{
 				"X-Custom-Header": "custom-header",
 			}
 			req, err = http.NewRequest("GET", "http://example.com", nil)
@@ -26,35 +26,35 @@ var _ = Describe("Metadata", func() {
 		It("should extract metadata from HTTP headers", func() {
 			req.Header.Add("X-Custom-Header", "value")
 
-			md := extractMetadata(headersToMetadata, req)
+			md := extractMetadata(headerToMetadata, req)
 			Expect(md["custom-header"]).To(ContainElement("value"))
 		})
 
-		It("should ignore headers not in the headersToMetadata map", func() {
+		It("should ignore headers not in the headerToMetadata map", func() {
 			req.Header.Add("X-Irrelevant-Header", "value")
 
-			md := extractMetadata(headersToMetadata, req)
+			md := extractMetadata(headerToMetadata, req)
 			Expect(md).NotTo(HaveKey("irrelevant-header"))
 		})
 	})
 
 	Describe("matchOutgoingHeader", func() {
-		var allowedMetadataKeys map[string]string
+		var metadataToHeader map[string]string
 
 		BeforeEach(func() {
-			allowedMetadataKeys = map[string]string{
+			metadataToHeader = map[string]string{
 				"custom-header": "X-Custom-Header",
 			}
 		})
 
 		It("should match allowed headers", func() {
-			header, ok := matchOutgoingHeader(allowedMetadataKeys, "custom-header")
+			header, ok := matchOutgoingHeader(metadataToHeader, "custom-header")
 			Expect(ok).To(BeTrue())
 			Expect(header).To(Equal("X-Custom-Header"))
 		})
 
 		It("should not match disallowed headers", func() {
-			header, ok := matchOutgoingHeader(allowedMetadataKeys, "other-header")
+			header, ok := matchOutgoingHeader(metadataToHeader, "other-header")
 			Expect(ok).To(BeFalse())
 			Expect(header).To(Equal(""))
 		})

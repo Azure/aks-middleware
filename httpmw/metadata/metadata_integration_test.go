@@ -26,20 +26,20 @@ var _ = Describe("Metadata Integration", func() {
 	)
 
 	BeforeEach(func() {
-		allowedMetadataKeys := map[string]string{
+		metadataToHeader := map[string]string{
 			"custom-header":      "X-Custom-Header",
 			"another-header":     "X-Another-Header",
 			"multi-value-header": "X-Multi-Value-Header",
 			"empty-metadata-key": "",
 		}
-		headersToMetadata := map[string]string{
+		headerToMetadata := map[string]string{
 			"X-Custom-Header":      "custom-header",
 			"X-Another-Header":     "another-header",
 			"X-Multi-Value-Header": "multi-value-header",
 			"X-Empty-Metadata":     "",
 		}
 
-		responseInterceptor := responseheader.UnaryServerInterceptor(allowedMetadataKeys)
+		responseInterceptor := responseheader.UnaryServerInterceptor(metadataToHeader)
 		grpcServer = grpc.NewServer(grpc.UnaryInterceptor(responseInterceptor))
 		testSrv = &testServer.TestServer{}
 		pb.RegisterMyGreeterServer(grpcServer, testSrv)
@@ -53,7 +53,7 @@ var _ = Describe("Metadata Integration", func() {
 			Expect(err).NotTo(HaveOccurred())
 		}()
 
-		mux = runtime.NewServeMux(NewMetadataMiddleware(allowedMetadataKeys, headersToMetadata)...)
+		mux = runtime.NewServeMux(NewMetadataMiddleware(headerToMetadata, metadataToHeader)...)
 
 		// Register the gRPC-Gateway handler to forward HTTP to gRPC
 		err = pb.RegisterMyGreeterHandlerFromEndpoint(context.Background(), mux, lis.Addr().String(), []grpc.DialOption{
@@ -106,7 +106,7 @@ var _ = Describe("Metadata Integration", func() {
 			// Verify the outgoing header
 			Expect(resp.Header.Get("X-Custom-Header")).To(Equal("value"))
 			// Disallowed headers should not be present in the response
-			Expect(resp.Header.Get("disallowed-header")).To(Equal(""))
+			Expect(resp.Header.Get("X-Disallowed-Header")).To(Equal(""))
 		})
 	})
 })

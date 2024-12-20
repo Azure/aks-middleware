@@ -19,12 +19,12 @@ const (
 )
 
 var (
-	AllowedMetadataKeys = map[string]string{
+	MetadataToHeader = map[string]string{
 		OperationIDKey:        RequestAcsOperationIDHeader,
 		ARMClientRequestIDKey: RequestARMClientRequestIDHeader,
 	}
 
-	HeadersToMetadata = map[string]string{
+	HeaderToMetadata = map[string]string{
 		RequestCorrelationIDHeader:      CorrelationIDKey,
 		RequestAcsOperationIDHeader:     OperationIDKey,
 		RequestARMClientRequestIDHeader: ARMClientRequestIDKey,

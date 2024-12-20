@@ -144,7 +144,7 @@ func DefaultServerInterceptors(options ServerInterceptorLogOptions) []grpc.Unary
 			logging.WithLogOnEvents(logging.FinishCall),
 			logging.WithFieldsFromContext(common.GetFields),
 		),
-		responseheader.UnaryServerInterceptor(common.AllowedMetadataKeys),
+		responseheader.UnaryServerInterceptor(common.MetadataToHeader),
 		recovery.UnaryServerInterceptor(GetRecoveryOpts()...),
 	}
 }
