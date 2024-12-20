@@ -17,3 +17,16 @@ const (
 	// metadata.
 	RequestIDMetadataHeader = "x-request-id"
 )
+
+var (
+	MetadataToHeader = map[string]string{
+		OperationIDKey:        RequestAcsOperationIDHeader,
+		ARMClientRequestIDKey: RequestARMClientRequestIDHeader,
+	}
+
+	HeaderToMetadata = map[string]string{
+		RequestCorrelationIDHeader:      CorrelationIDKey,
+		RequestAcsOperationIDHeader:     OperationIDKey,
+		RequestARMClientRequestIDHeader: ARMClientRequestIDKey,
+	}
+)

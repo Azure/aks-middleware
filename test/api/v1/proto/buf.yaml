@@ -8,5 +8,7 @@ lint:
 deps:
   - buf.build/bufbuild/protovalidate
   - buf.build/service-hub/loggable
+  - buf.build/googleapis/googleapis
+  - buf.build/grpc-ecosystem/grpc-gateway
 
 # <snip>

@@ -9,6 +9,7 @@ import (
 	"github.com/Azure/aks-middleware/ctxlogger"
 	"github.com/Azure/aks-middleware/mdforward"
 	"github.com/Azure/aks-middleware/requestid"
+	"github.com/Azure/aks-middleware/responseheader"
 
 	log "log/slog"
 	"strings"
@@ -143,6 +144,7 @@ func DefaultServerInterceptors(options ServerInterceptorLogOptions) []grpc.Unary
 			logging.WithLogOnEvents(logging.FinishCall),
 			logging.WithFieldsFromContext(common.GetFields),
 		),
+		responseheader.UnaryServerInterceptor(common.MetadataToHeader),
 		recovery.UnaryServerInterceptor(GetRecoveryOpts()...),
 	}
 }
