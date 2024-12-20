@@ -23,7 +23,6 @@ func copyMetadata(ctx context.Context, allowedMetadataKeys map[string]string) er
 	if !ok {
 		return nil
 	}
-
 	// Filter and set the allowed metadata as response headers
 	filteredMD := metadata.New(nil)
 	for key := range allowedMetadataKeys {

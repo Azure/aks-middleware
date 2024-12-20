@@ -2,7 +2,7 @@ package ctxlogger_test
 
 import (
 	"github.com/Azure/aks-middleware/ctxlogger"
-	pb "github.com/Azure/aks-middleware/test"
+	pb "github.com/Azure/aks-middleware/test/api/v1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
