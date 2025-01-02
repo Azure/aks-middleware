@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	"github.com/Azure/aks-middleware/grpcserver/responseheader"
+	"github.com/Azure/aks-middleware/grpc/server/responseheader"
 	pb "github.com/Azure/aks-middleware/test/api/v1"
 	testServer "github.com/Azure/aks-middleware/test/server"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"

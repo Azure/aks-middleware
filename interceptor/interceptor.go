@@ -6,10 +6,10 @@ import (
 
 	"github.com/Azure/aks-middleware/common"
 	"github.com/Azure/aks-middleware/common/autologger"
-	"github.com/Azure/aks-middleware/grpcclient/mdforward"
-	"github.com/Azure/aks-middleware/grpcserver/ctxlogger"
-	"github.com/Azure/aks-middleware/grpcserver/requestid"
-	"github.com/Azure/aks-middleware/grpcserver/responseheader"
+	"github.com/Azure/aks-middleware/grpc/client/mdforward"
+	"github.com/Azure/aks-middleware/grpc/server/ctxlogger"
+	"github.com/Azure/aks-middleware/grpc/server/requestid"
+	"github.com/Azure/aks-middleware/grpc/server/responseheader"
 
 	log "log/slog"
 	"strings"

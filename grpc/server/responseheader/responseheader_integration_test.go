@@ -1,9 +1,10 @@
-package responseheader
+package responseheader_test
 
 import (
 	"context"
 	"net"
 
+	"github.com/Azure/aks-middleware/grpc/server/responseheader"
 	pb "github.com/Azure/aks-middleware/test/api/v1"
 	"github.com/Azure/aks-middleware/test/server"
 	. "github.com/onsi/ginkgo/v2"
@@ -33,7 +34,7 @@ var _ = Describe("ResponseHeader Interceptor Integration", func() {
 			"empty-metadata-key": "",
 		}
 		grpcServer = grpc.NewServer(
-			grpc.UnaryInterceptor(UnaryServerInterceptor(metadataToHeader)),
+			grpc.UnaryInterceptor(responseheader.UnaryServerInterceptor(metadataToHeader)),
 		)
 		testSrv = &server.TestServer{}
 		pb.RegisterMyGreeterServer(grpcServer, testSrv)

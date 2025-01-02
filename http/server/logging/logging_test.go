@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"time"
 
-	"github.com/Azure/aks-middleware/httpserver/requestid"
+	"github.com/Azure/aks-middleware/http/server/requestid"
 	"github.com/gorilla/mux"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"

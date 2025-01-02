@@ -7,7 +7,7 @@ import (
 
 	log "log/slog"
 
-	"github.com/Azure/aks-middleware/httpclient-direct/restlogger"
+	"github.com/Azure/aks-middleware/http/client/direct/restlogger"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
