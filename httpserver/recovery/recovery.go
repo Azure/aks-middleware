@@ -4,7 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/Azure/aks-middleware/httpmw/logging"
+	"github.com/Azure/aks-middleware/httpserver/logging"
 	"github.com/gorilla/mux"
 )
 

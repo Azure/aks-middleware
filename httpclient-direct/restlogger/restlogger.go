@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Azure/aks-middleware/logging"
+	"github.com/Azure/aks-middleware/common/logging"
 )
 
 type LoggingRoundTripper struct {

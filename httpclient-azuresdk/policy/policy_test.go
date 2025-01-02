@@ -8,7 +8,7 @@ import (
 
 	log "log/slog"
 
-	serviceHubPolicy "github.com/Azure/aks-middleware/policy"
+	serviceHubPolicy "github.com/Azure/aks-middleware/httpclient-azuresdk/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime"
 	. "github.com/onsi/ginkgo/v2"

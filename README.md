@@ -10,6 +10,7 @@
  	* 2.3. [autologger (api request/response logger)](#autologgerapirequestresponselogger)
  	* 2.4. [recovery](#recovery)
  	* 2.5. [protovalidate](#protovalidate)
+	* 2.6. [responseheader](#responseheader)
 * 3. [gRPC client](#gRPCclient)
  	* 3.1. [mdforward](#mdforward)
  	* 3.2. [autologger (api request/response logger)](#autologgerapirequestresponselogger-1)
@@ -91,6 +92,12 @@ Once a panic is detected, it is handled by a custom recovery function defined in
 This is to validate the requests from the client.
 
 The validation rules are generated and executed by the protovalidate-go library, and the rules are applied to the variables in the api.proto file.
+
+### 2.6. <a id='responseheader'></a>responseheader
+
+This is to copy the metadata that the server receives from the incoming request into the response header.
+
+The interceptor accepts a map of strings that it uses to determine which metadata will be copied into the response.
 
 ## 3. <a id='gRPCclient'></a>gRPC client
 

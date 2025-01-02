@@ -1,7 +1,6 @@
-package interceptor_test
+package common
 
 import (
-	"github.com/Azure/aks-middleware/interceptor"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -57,7 +56,7 @@ var _ = Describe("Recovery test", func() {
 					/root/go/pkg/mod/google.golang.org/grpc@v1.58.1/server.go:998 +0x98
 				created by google.golang.org/grpc.(*Server).serveStreams.func1
 					/root/go/pkg/mod/google.golang.org/grpc@v1.58.1/server.go:996 +0x18c`
-			file, line := interceptor.ParseStack(trace)
+			file, line := ParseStack(trace)
 			Expect(file).To(ContainSubstring("api.go"))
 			Expect(line).To(Equal("34"))
 		})
