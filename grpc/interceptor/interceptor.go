@@ -4,12 +4,13 @@ import (
 	"io"
 	"os"
 
-	"github.com/Azure/aks-middleware/common"
-	"github.com/Azure/aks-middleware/common/autologger"
 	"github.com/Azure/aks-middleware/grpc/client/mdforward"
+	"github.com/Azure/aks-middleware/grpc/common"
+	"github.com/Azure/aks-middleware/grpc/common/autologger"
 	"github.com/Azure/aks-middleware/grpc/server/ctxlogger"
 	"github.com/Azure/aks-middleware/grpc/server/requestid"
 	"github.com/Azure/aks-middleware/grpc/server/responseheader"
+	httpcommon "github.com/Azure/aks-middleware/http/common"
 
 	log "log/slog"
 	"strings"
@@ -144,7 +145,7 @@ func DefaultServerInterceptors(options ServerInterceptorLogOptions) []grpc.Unary
 			logging.WithLogOnEvents(logging.FinishCall),
 			logging.WithFieldsFromContext(common.GetFields),
 		),
-		responseheader.UnaryServerInterceptor(common.MetadataToHeader),
+		responseheader.UnaryServerInterceptor(httpcommon.MetadataToHeader),
 		recovery.UnaryServerInterceptor(common.GetRecoveryOpts()...),
 	}
 }

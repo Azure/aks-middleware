@@ -8,7 +8,7 @@ import (
 	log "log/slog"
 
 	loggable "buf.build/gen/go/service-hub/loggable/protocolbuffers/go/proto"
-	"github.com/Azure/aks-middleware/common"
+	"github.com/Azure/aks-middleware/grpc/common"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"

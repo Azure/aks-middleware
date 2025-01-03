@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/aks-middleware/common"
+	"github.com/Azure/aks-middleware/http/common"
 	azcorePolicy "github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 )
 

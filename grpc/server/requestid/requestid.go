@@ -7,7 +7,7 @@ import (
 	"encoding/base64"
 	"io"
 
-	"github.com/Azure/aks-middleware/common"
+	"github.com/Azure/aks-middleware/http/common"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 )

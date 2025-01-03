@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/Azure/aks-middleware/common/logging"
+	"github.com/Azure/aks-middleware/http/common/logging"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"

@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Azure/aks-middleware/common/logging"
+	"github.com/Azure/aks-middleware/http/common/logging"
 	armPolicy "github.com/Azure/azure-sdk-for-go/sdk/azcore/arm/policy"
 	azcorePolicy "github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"google.golang.org/grpc/codes"

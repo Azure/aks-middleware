@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 
+	httpcommon "github.com/Azure/aks-middleware/http/common"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	"google.golang.org/grpc/metadata"
 )
@@ -22,10 +23,10 @@ func getMetadata(ctx context.Context) map[string]string {
 		return headersFromMD
 	}
 	for _, key := range []string{
-		RequestIDMetadataHeader,
-		CorrelationIDKey,
-		OperationIDKey,
-		ARMClientRequestIDKey,
+		httpcommon.RequestIDMetadataHeader,
+		httpcommon.CorrelationIDKey,
+		httpcommon.OperationIDKey,
+		httpcommon.ARMClientRequestIDKey,
 	} {
 		if vals := md.Get(key); len(vals) > 0 {
 			headersFromMD[key] = vals[0]
