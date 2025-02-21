@@ -56,6 +56,7 @@ func getMethodInfo(method string, rawURL string) string {
     id, err := arm.ParseResourceID(validURL)
     if err != nil {
         // Retry by appending a false resource name ("dummy")
+		// To be a valid resource ID, the URL must end with the resource name.
         fakeURL := validURL
         if !strings.HasSuffix(validURL, "/dummy") {
             fakeURL = validURL + "/dummy"
