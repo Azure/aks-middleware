@@ -29,22 +29,21 @@ func trimToSubscription(rawURL string) string {
 }
 
 func sanitizeResourceType(rt string, rawURL string) string {
-	// Keep only the substring after the last slash.
+    // Keep only the substring after the last slash.
     if idx := strings.LastIndex(rt, "/"); idx != -1 && idx < len(rt)-1 {
         rt = rt[idx+1:]
     }
-    // Remove any query parameters, e.g. "api-version=..."
-    if idx := strings.Index(rt, "api-version"); idx != -1 {
+    // Remove everything after the first '?'.
+    if idx := strings.Index(rt, "?"); idx != -1 {
         rt = rt[:idx]
     }
     
-	// Remove any trailing '?' and convert to lowercase.
-	rt = strings.ToLower(strings.TrimSuffix(rt, "?"))
+    rt = strings.ToLower(rt)
     
-	// If the resource type is empty, return the raw URL.
-	if rt == "" {
-		return rawURL
-	}
+    // If the remaining resource type is empty or still contains api-version, its a malformed URL
+    if rt == "" ||  strings.Contains(rt, "api-version") {
+        return rawURL
+    }
     return rt
 }
 

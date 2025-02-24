@@ -120,7 +120,7 @@ var _ = Describe("LogRequest", func() {
 	})
 	Context("when using a custom resource type", func() {
 		It("logs the correct method info", func() {
-			parsedURL, err := url.Parse("https://management.azure.com/subscriptions/sub_id/customResourceGroup/resource_name/providers/Microsoft.Storage/customResource/resource_name?api-version=version")
+			parsedURL, err := url.Parse("http://nodeprovisioner-svc.nodeprovisioner.svc.cluster.local:80/subscriptions/26ad903f-2330-429d-8389-864ac35c4350/resourceGroups/e2erg-tomabraebld114261747-nRi/providers/Microsoft.ContainerService/managedclusters/e2eaks-Sfs/nodeBootstrapping")
 			Expect(err).To(BeNil())
 
 			params := logging.LogRequestParams{
@@ -130,7 +130,7 @@ var _ = Describe("LogRequest", func() {
 				Response:  &http.Response{StatusCode: 200},
 				Error:     nil,
 			}
-			expected := "GET customresource - READ"
+			expected := "GET nodebootstrapping - LIST"
 			logging.LogRequest(params)
 			Expect(logBuffer.String()).To(ContainSubstring(expected))
 		})
@@ -148,23 +148,6 @@ var _ = Describe("LogRequest", func() {
 				Error:     nil,
 			}
 			expected := "GET storageaccounts - LIST"
-			logging.LogRequest(params)
-			Expect(logBuffer.String()).To(ContainSubstring(expected))
-		})
-	})
-    Context ("when making a request using Node Provisioner Client", func() {
-		It("logs the correct method info", func() {
-			parsedURL, err := url.Parse("http://nodeprovisioner-svc.nodeprovisioner.svc.cluster.local:80/subscriptions/26ad903f-2330-429d-8389-864ac35c4350/resourceGroups/e2erg-tomabraebld114261747-nRi/providers/Microsoft.ContainerService/managedclusters/e2eaks-Sfs/nodeBootstrapping")
-			Expect(err).To(BeNil())
-
-			params := logging.LogRequestParams{
-				Logger:    logger,
-				StartTime: time.Now(),
-				Request:   &http.Request{Method: "GET", URL: parsedURL},
-				Response:  &http.Response{StatusCode: 200},
-				Error:     nil,
-			}
-			expected := "GET nodebootstrapping - LIST"
 			logging.LogRequest(params)
 			Expect(logBuffer.String()).To(ContainSubstring(expected))
 		})
