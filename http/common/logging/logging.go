@@ -37,13 +37,8 @@ func sanitizeResourceType(rt string, rawURL string) string {
     if idx := strings.Index(rt, "?"); idx != -1 {
         rt = rt[:idx]
     }
-    
     rt = strings.ToLower(rt)
     
-    // If the remaining resource type is empty or still contains api-version, its a malformed URL
-    if rt == "" ||  strings.Contains(rt, "api-version") {
-        return rawURL
-    }
     return rt
 }
 
