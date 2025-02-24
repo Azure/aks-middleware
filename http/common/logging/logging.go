@@ -28,7 +28,7 @@ func trimToSubscription(rawURL string) string {
     return rawURL
 }
 
-func sanitizeResourceType(rt string, rawURL string) string {
+func sanitizeResourceType(rt string) string {
     // Keep only the substring after the last slash.
     if idx := strings.LastIndex(rt, "/"); idx != -1 && idx < len(rt)-1 {
         rt = rt[idx+1:]
@@ -63,9 +63,9 @@ func getMethodInfo(method string, rawURL string) string {
         // We know a fake resource name was added.
         if method == "GET" {
             // For GET requests with a fake name, we assume it's a list operation.
-            return method + " " + sanitizeResourceType(id.ResourceType.String(), rawURL) + " - LIST"
+            return method + " " + sanitizeResourceType(id.ResourceType.String()) + " - LIST"
         }
-        return method + " " + sanitizeResourceType(id.ResourceType.String(), rawURL)
+        return method + " " + sanitizeResourceType(id.ResourceType.String())
     }
 
     // If parsing was successful on the first try.
@@ -74,9 +74,9 @@ func getMethodInfo(method string, rawURL string) string {
         if strings.TrimSpace(id.Name) == "" {
             op = " - LIST"
         }
-        return method + " " + sanitizeResourceType(id.ResourceType.String(), rawURL) + op
+        return method + " " + sanitizeResourceType(id.ResourceType.String()) + op
     }
-    return method + " " + sanitizeResourceType(id.ResourceType.String(), rawURL)
+    return method + " " + sanitizeResourceType(id.ResourceType.String())
 }
 
 func trimURL(parsedURL url.URL) string {
