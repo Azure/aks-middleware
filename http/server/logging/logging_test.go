@@ -21,6 +21,8 @@ var _ = Describe("Httpmw Integration Test", func() {
 	var (
 		router      *mux.Router
 		auditClient *audit.Client
+		buf        *bytes.Buffer
+		slogLogger *slog.Logger
 	)
 
 	// Helper function to create a real audit client
@@ -47,7 +49,7 @@ var _ = Describe("Httpmw Integration Test", func() {
 			}
 		}
 		router.Use(requestid.NewRequestIDMiddlewareWithExtractor(customExtractor))
-		router.Use(NewLogging(slogLogger))
+		router.Use(NewLogging(slogLogger, nil, nil))
 
 		router.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
 			time.Sleep(10 * time.Millisecond)
