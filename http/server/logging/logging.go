@@ -14,12 +14,13 @@ import (
 // https://medium.com/@ansujain/building-a-logger-wrapper-in-go-with-support-for-multiple-logging-libraries-48092b826bee
 
 // more info about http handler here: https://pkg.go.dev/net/http#Handler
-func NewLogging(logger *slog.Logger) mux.MiddlewareFunc {
+func NewLogging(logger *slog.Logger, otelConfig *OtelConfig) mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return &loggingMiddleware{
-			next:   next,
-			now:    time.Now,
-			logger: *logger,
+			next:       next,
+			now:        time.Now,
+			logger:     *logger,
+			otelConfig: otelConfig,
 		}
 	}
 }
@@ -28,9 +29,10 @@ func NewLogging(logger *slog.Logger) mux.MiddlewareFunc {
 var _ http.Handler = &loggingMiddleware{}
 
 type loggingMiddleware struct {
-	next   http.Handler
-	now    func() time.Time
-	logger slog.Logger
+	next       http.Handler
+	now        func() time.Time
+	logger     slog.Logger
+	otelConfig *OtelConfig
 }
 
 type responseWriter struct {
@@ -63,6 +65,7 @@ func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	latency := endTime.Sub(startTime)
 	l.LogRequestEnd(ctx, r, "RequestEnd", customWriter.statusCode, latency)
 	l.LogRequestEnd(ctx, r, "finished call", customWriter.statusCode, latency)
+	l.sendOtelAuditEvent(ctx, customWriter.statusCode, r)
 }
 
 func BuildAttributes(ctx context.Context, r *http.Request, extra ...interface{}) []interface{} {
