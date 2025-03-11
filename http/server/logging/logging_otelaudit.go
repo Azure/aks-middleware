@@ -32,7 +32,7 @@ func (l *loggingMiddleware) sendOtelAuditEvent(ctx context.Context, statusCode i
 	}
 }
 
-func createOtelAuditEvent(logger slog.Logger, statusCode int, req *http.Request, otelConfig *OtelConfig) msgs.Msg {
+func createOtelAuditEvent(logger *slog.Logger, statusCode int, req *http.Request, otelConfig *OtelConfig) msgs.Msg {
 	host, _, err := net.SplitHostPort(req.RemoteAddr)
 	if err != nil {
 		logger.Error("failed to split host and port", "error", err)
@@ -134,16 +134,14 @@ func getOperationCategoryDescription(method string, opCategoryDesc map[string]st
 }
 
 func getOperationType(method string) msgs.OperationType {
-	switch method {
-	case http.MethodGet:
-		return msgs.Read
-	case http.MethodPatch, http.MethodPost, http.MethodPut:
-		return msgs.Update
-	case http.MethodDelete:
-		return msgs.Delete
-	default:
-		return msgs.Read
-	}
+    switch method {
+        case http.MethodPatch, http.MethodPost, http.MethodPut:
+            return msgs.Update
+        case http.MethodDelete:
+            return msgs.Delete
+        default:
+            return msgs.Read
+    }
 }
 
 func getOperationResult(statusCode int) msgs.OperationResult {

@@ -19,7 +19,7 @@ func NewLogging(logger *slog.Logger, otelConfig *OtelConfig) mux.MiddlewareFunc 
 		return &loggingMiddleware{
 			next:       next,
 			now:        time.Now,
-			logger:     *logger,
+			logger:     logger,
 			otelConfig: otelConfig,
 		}
 	}
@@ -31,7 +31,7 @@ var _ http.Handler = &loggingMiddleware{}
 type loggingMiddleware struct {
 	next       http.Handler
 	now        func() time.Time
-	logger     slog.Logger
+	logger     *slog.Logger
 	otelConfig *OtelConfig
 }
 

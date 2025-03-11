@@ -122,7 +122,7 @@ var _ = Describe("Httpmw Integration Test", func() {
 
 			mw := &loggingMiddleware{
 				next:       router,
-				logger:     *slogLogger,
+				logger:     slogLogger,
 				otelConfig: otelConfig,
 			}
 
@@ -155,7 +155,7 @@ var _ = Describe("Httpmw Integration Test", func() {
 
 			mw := &loggingMiddleware{
 				next:       router,
-				logger:     *slogLogger,
+				logger:     slogLogger,
 				otelConfig: nilConfig,
 			}
 
@@ -181,7 +181,7 @@ var _ = Describe("Httpmw Integration Test", func() {
 
 			mw := &loggingMiddleware{
 				next:       router,
-				logger:     *slogLogger,
+				logger:     slogLogger,
 				otelConfig: otelConfig,
 			}
 
@@ -210,7 +210,7 @@ var _ = Describe("Httpmw Integration Test", func() {
 		
 			mw := &loggingMiddleware{
 				next:       router,
-				logger:     *slogLogger,
+				logger:     slogLogger,
 				otelConfig: otelConfig,
 			}
 		
@@ -240,7 +240,7 @@ var _ = Describe("Httpmw Integration Test", func() {
 
             mw := &loggingMiddleware{
                 next:       router,
-                logger:    *slogLogger,
+                logger:    slogLogger,
                 otelConfig: otelConfig,
             }
 
