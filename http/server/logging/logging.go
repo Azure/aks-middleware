@@ -12,13 +12,22 @@ import (
 
 // TODO (Tom): Add a logger wrapper in its own package
 // https://medium.com/@ansujain/building-a-logger-wrapper-in-go-with-support-for-multiple-logging-libraries-48092b826bee
+
 // more info about http handler here: https://pkg.go.dev/net/http#Handler
-func NewLogging(logger *slog.Logger) mux.MiddlewareFunc {
+type loggingfunc func(w http.ResponseWriter, r *http.Request, extraAttributes map[string]interface{}) map[string]interface{}
+type CustomAttributes struct {
+	customAttributes     map[string]interface{}
+	attributeInitializer *loggingfunc // sets keys for custom attributes at the beginning of ServeHTTP()
+	attributeAssigner    *loggingfunc // assigns values for custom attributes after request has completed
+}
+
+func NewLogging(logger *slog.Logger, customAttributeAssigner *CustomAttributes) mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return &loggingMiddleware{
-			next:   next,
-			now:    time.Now,
-			logger: *logger,
+			next:                    next,
+			now:                     time.Now,
+			logger:                  *logger,
+			customAttributeAssigner: *customAttributeAssigner,
 		}
 	}
 }
@@ -27,9 +36,11 @@ func NewLogging(logger *slog.Logger) mux.MiddlewareFunc {
 var _ http.Handler = &loggingMiddleware{}
 
 type loggingMiddleware struct {
-	next   http.Handler
-	now    func() time.Time
-	logger slog.Logger
+	next                    http.Handler
+	now                     func() time.Time
+	logger                  slog.Logger
+	source                  string
+	customAttributeAssigner CustomAttributes
 }
 
 type responseWriter struct {
@@ -50,24 +61,32 @@ func (w *responseWriter) Write(b []byte) (int, error) {
 }
 
 func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	extraAttributes := (*l.customAttributeAssigner.attributeInitializer)(w, r, l.customAttributeAssigner.customAttributes)
 	customWriter := &responseWriter{ResponseWriter: w}
-
 	startTime := l.now()
 	ctx := r.Context()
 
-	l.LogRequestStart(ctx, r, "RequestStart")
+	l.LogRequestStart(ctx, r, "RequestStart", extraAttributes)
 	l.next.ServeHTTP(customWriter, r.WithContext(ctx))
 	endTime := l.now()
 
 	latency := endTime.Sub(startTime)
-	l.LogRequestEnd(ctx, r, "RequestEnd", customWriter.statusCode, latency)
-	l.LogRequestEnd(ctx, r, "finished call", customWriter.statusCode, latency)
+	extraAttributes = (*l.customAttributeAssigner.attributeAssigner)(w, r, l.customAttributeAssigner.customAttributes)
+	l.LogRequestEnd(ctx, r, "RequestEnd", customWriter.statusCode, latency, extraAttributes)
+	l.LogRequestEnd(ctx, r, "finished call", customWriter.statusCode, latency, extraAttributes)
 }
 
-func BuildAttributes(ctx context.Context, r *http.Request, extra ...interface{}) []interface{} {
+func (l *loggingMiddleware) BuildLoggingAttributes(ctx context.Context, r *http.Request, extra ...interface{}) []interface{} {
+	if len(l.source) == 0 {
+		l.source = "ApiRequestLog"
+	}
+	return BuildAttributes(ctx, r, l.source, extra)
+}
+
+func BuildAttributes(ctx context.Context, r *http.Request, source string, extra ...interface{}) []interface{} {
 	md, ok := metadata.FromIncomingContext(ctx)
 	attributes := []interface{}{
-		"source", "ApiRequestLog",
+		"source", source,
 		"protocol", "HTTP",
 		"method_type", "unary",
 		"component", "server",
@@ -90,12 +109,12 @@ func BuildAttributes(ctx context.Context, r *http.Request, extra ...interface{})
 	return attributes
 }
 
-func (l *loggingMiddleware) LogRequestStart(ctx context.Context, r *http.Request, msg string) {
-	attributes := BuildAttributes(ctx, r)
+func (l *loggingMiddleware) LogRequestStart(ctx context.Context, r *http.Request, msg string, extraAttributes map[string]interface{}) {
+	attributes := l.BuildLoggingAttributes(ctx, r, extraAttributes)
 	l.logger.InfoContext(ctx, msg, attributes...)
 }
 
-func (l *loggingMiddleware) LogRequestEnd(ctx context.Context, r *http.Request, msg string, statusCode int, duration time.Duration) {
-	attributes := BuildAttributes(ctx, r, "code", statusCode, "time_ms", duration.Milliseconds())
+func (l *loggingMiddleware) LogRequestEnd(ctx context.Context, r *http.Request, msg string, statusCode int, duration time.Duration, extraAttributes map[string]interface{}) {
+	attributes := l.BuildLoggingAttributes(ctx, r, "code", statusCode, "time_ms", duration.Milliseconds(), extraAttributes)
 	l.logger.InfoContext(ctx, msg, attributes...)
 }

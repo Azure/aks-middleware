@@ -34,7 +34,7 @@ var _ = Describe("Httpmw", func() {
 			}
 		}
 		router.Use(requestid.NewRequestIDMiddlewareWithExtractor(customExtractor))
-		router.Use(NewLogging(slogLogger))
+		router.Use(NewLogging(slogLogger, nil))
 
 		router.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
 			time.Sleep(10 * time.Millisecond)
