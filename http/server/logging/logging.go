@@ -14,11 +14,12 @@ import (
 // https://medium.com/@ansujain/building-a-logger-wrapper-in-go-with-support-for-multiple-logging-libraries-48092b826bee
 
 // more info about http handler here: https://pkg.go.dev/net/http#Handler
-type loggingfunc func(w http.ResponseWriter, r *http.Request, extraAttributes map[string]interface{}) map[string]interface{}
+type initFunc func(w http.ResponseWriter, r *http.Request) map[string]interface{}
+type loggingFunc func(w http.ResponseWriter, r *http.Request, attrs map[string]interface{}) map[string]interface{}
 type CustomAttributes struct {
-	customAttributes     map[string]interface{}
-	attributeInitializer *loggingfunc // sets keys for custom attributes at the beginning of ServeHTTP()
-	attributeAssigner    *loggingfunc // assigns values for custom attributes after request has completed
+	//CustomAttributeKeys  []slog.Attr
+	AttributeInitializer *initFunc    // sets keys for custom attributes at the beginning of ServeHTTP()
+	AttributeAssigner    *loggingFunc // assigns values for custom attributes after request has completed
 }
 
 func NewLogging(logger *slog.Logger, customAttributeAssigner *CustomAttributes) mux.MiddlewareFunc {
@@ -61,7 +62,13 @@ func (w *responseWriter) Write(b []byte) (int, error) {
 }
 
 func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	extraAttributes := (*l.customAttributeAssigner.attributeInitializer)(w, r, l.customAttributeAssigner.customAttributes)
+	// if any fields in CustomAttributes are nil, do not call them to avoid errors
+	addExtraAttributes := validateCustomAttributes(&l.customAttributeAssigner)
+	var extraAttributes map[string]interface{}
+	if addExtraAttributes {
+		extraAttributes = (*l.customAttributeAssigner.AttributeInitializer)(w, r) // we don't want to return error from this, which is dangerous. Need error checking to make sure that each custom attribute is being taken care of by func..?
+	}
+
 	customWriter := &responseWriter{ResponseWriter: w}
 	startTime := l.now()
 	ctx := r.Context()
@@ -71,9 +78,14 @@ func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	endTime := l.now()
 
 	latency := endTime.Sub(startTime)
-	extraAttributes = (*l.customAttributeAssigner.attributeAssigner)(w, r, l.customAttributeAssigner.customAttributes)
-	l.LogRequestEnd(ctx, r, "RequestEnd", customWriter.statusCode, latency, extraAttributes)
-	l.LogRequestEnd(ctx, r, "finished call", customWriter.statusCode, latency, extraAttributes)
+
+	var updatedAttrs map[string]interface{}
+	if addExtraAttributes {
+		updatedAttrs = (*l.customAttributeAssigner.AttributeAssigner)(w, r, extraAttributes)
+	}
+
+	l.LogRequestEnd(ctx, r, "RequestEnd", customWriter.statusCode, latency, updatedAttrs)
+	l.LogRequestEnd(ctx, r, "finished call", customWriter.statusCode, latency, updatedAttrs)
 }
 
 func (l *loggingMiddleware) BuildLoggingAttributes(ctx context.Context, r *http.Request, extra ...interface{}) []interface{} {
@@ -85,7 +97,7 @@ func (l *loggingMiddleware) BuildLoggingAttributes(ctx context.Context, r *http.
 
 func BuildAttributes(ctx context.Context, r *http.Request, source string, extra ...interface{}) []interface{} {
 	md, ok := metadata.FromIncomingContext(ctx)
-	attributes := []interface{}{
+	attributes := []interface{}{ //TODO: should this be called only once? Why is this being set on every LogRequestStart and LogRequestEnd?
 		"source", source,
 		"protocol", "HTTP",
 		"method_type", "unary",
@@ -117,4 +129,17 @@ func (l *loggingMiddleware) LogRequestStart(ctx context.Context, r *http.Request
 func (l *loggingMiddleware) LogRequestEnd(ctx context.Context, r *http.Request, msg string, statusCode int, duration time.Duration, extraAttributes map[string]interface{}) {
 	attributes := l.BuildLoggingAttributes(ctx, r, "code", statusCode, "time_ms", duration.Milliseconds(), extraAttributes)
 	l.logger.InfoContext(ctx, msg, attributes...)
+}
+
+// Returns true if extra attributes should be logged, false otherwise
+func validateCustomAttributes(attrStruct *CustomAttributes) bool {
+	if attrStruct == nil {
+		return false
+	} else if attrStruct.AttributeInitializer == nil {
+		return false
+	} else if attrStruct.AttributeAssigner == nil {
+		return false
+	} else {
+		return true
+	}
 }
