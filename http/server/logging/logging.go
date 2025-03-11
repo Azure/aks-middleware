@@ -22,13 +22,13 @@ type CustomAttributes struct {
 	AttributeAssigner    *loggingFunc // assigns values for custom attributes after request has completed
 }
 
-func NewLogging(logger *slog.Logger, customAttributeAssigner *CustomAttributes) mux.MiddlewareFunc {
+func NewLogging(logger *slog.Logger, customAttributeAssigner CustomAttributes) mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return &loggingMiddleware{
 			next:                    next,
 			now:                     time.Now,
 			logger:                  *logger,
-			customAttributeAssigner: *customAttributeAssigner,
+			customAttributeAssigner: customAttributeAssigner,
 		}
 	}
 }
@@ -62,8 +62,9 @@ func (w *responseWriter) Write(b []byte) (int, error) {
 }
 
 func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// if any fields in CustomAttributes are nil, do not call them to avoid errors
+	// If any fields in CustomAttributes are nil, do not call them to avoid errors
 	addExtraAttributes := validateCustomAttributes(&l.customAttributeAssigner)
+
 	var extraAttributes map[string]interface{}
 	if addExtraAttributes {
 		extraAttributes = (*l.customAttributeAssigner.AttributeInitializer)(w, r) // we don't want to return error from this, which is dangerous. Need error checking to make sure that each custom attribute is being taken care of by func..?
@@ -121,13 +122,13 @@ func BuildAttributes(ctx context.Context, r *http.Request, source string, extra 
 	return attributes
 }
 
-func (l *loggingMiddleware) LogRequestStart(ctx context.Context, r *http.Request, msg string, extraAttributes map[string]interface{}) {
-	attributes := l.BuildLoggingAttributes(ctx, r, extraAttributes)
+func (l *loggingMiddleware) LogRequestStart(ctx context.Context, r *http.Request, msg string, extraAttributes ...map[string]interface{}) {
+	attributes := l.BuildLoggingAttributes(ctx, r)
 	l.logger.InfoContext(ctx, msg, attributes...)
 }
 
 func (l *loggingMiddleware) LogRequestEnd(ctx context.Context, r *http.Request, msg string, statusCode int, duration time.Duration, extraAttributes map[string]interface{}) {
-	attributes := l.BuildLoggingAttributes(ctx, r, "code", statusCode, "time_ms", duration.Milliseconds(), extraAttributes)
+	attributes := l.BuildLoggingAttributes(ctx, r, "code", statusCode, "time_ms", duration.Milliseconds())
 	l.logger.InfoContext(ctx, msg, attributes...)
 }
 
