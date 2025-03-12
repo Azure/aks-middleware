@@ -147,8 +147,6 @@ var _ = Describe("Httpmw", func() {
 			Expect(buf2.String()).To(ContainSubstring(`"correlationid":"test-correlation-id"`))
 			Expect(buf2.String()).ToNot(ContainSubstring(`"armclientrequestid"`))
 
-			// test extra values
-
 			Expect(buf2.String()).To(ContainSubstring("finished call"))
 			Expect(buf2.String()).To(ContainSubstring(`"source":"customSource"`)) // source should equal custom value
 			Expect(buf2.String()).To(ContainSubstring(`"protocol":"HTTP"`))
@@ -158,6 +156,7 @@ var _ = Describe("Httpmw", func() {
 			Expect(buf2.String()).To(ContainSubstring(`"service":"`))
 			Expect(buf2.String()).To(ContainSubstring(`"url":"`))
 
+			// check extra attributes
 			Expect(buf2.String()).To(ContainSubstring(`"%s":"%s"`, rgnameKey, "test-rgname-value"))
 			Expect(buf2.String()).To(ContainSubstring(`"%s":"%s"`, subIdKey, "test-subid-value"))
 			Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
