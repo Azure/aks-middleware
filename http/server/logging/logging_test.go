@@ -40,7 +40,7 @@ var _ = Describe("Httpmw", func() {
 			}
 		}
 		router.Use(requestid.NewRequestIDMiddlewareWithExtractor(customExtractor))
-		router.Use(NewLogging(slogLogger, CustomAttributes{}))
+		router.Use(NewLogging(slogLogger, "", CustomAttributes{}))
 
 		router.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
 			time.Sleep(10 * time.Millisecond)
@@ -80,7 +80,7 @@ var _ = Describe("Httpmw", func() {
 
 		buf2 = new(bytes.Buffer)
 		slogLogger2 := slog.New(slog.NewJSONHandler(buf2, nil))
-		routerWithExtraLogging.Use(NewLogging(slogLogger2, customAttributes))
+		routerWithExtraLogging.Use(NewLogging(slogLogger2, "customSource", customAttributes))
 
 		routerWithExtraLogging.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
 			time.Sleep(10 * time.Millisecond)
@@ -148,6 +148,16 @@ var _ = Describe("Httpmw", func() {
 			Expect(buf2.String()).ToNot(ContainSubstring(`"armclientrequestid"`))
 
 			// test extra values
+
+			Expect(buf2.String()).To(ContainSubstring("finished call"))
+			Expect(buf2.String()).To(ContainSubstring(`"source":"customSource"`)) // source should equal custom value
+			Expect(buf2.String()).To(ContainSubstring(`"protocol":"HTTP"`))
+			Expect(buf2.String()).To(ContainSubstring(`"method_type":"unary"`))
+			Expect(buf2.String()).To(ContainSubstring(`"component":"server"`))
+			Expect(buf2.String()).To(ContainSubstring(`"time_ms":`))
+			Expect(buf2.String()).To(ContainSubstring(`"service":"`))
+			Expect(buf2.String()).To(ContainSubstring(`"url":"`))
+
 			Expect(buf2.String()).To(ContainSubstring(`"%s":"%s"`, rgnameKey, "test-rgname-value"))
 			Expect(buf2.String()).To(ContainSubstring(`"%s":"%s"`, subIdKey, "test-subid-value"))
 			Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
@@ -155,6 +165,7 @@ var _ = Describe("Httpmw", func() {
 	})
 })
 
+// Used only for testing
 type OperationRequest struct {
 	ResourceName   string
 	SubscriptionID string
@@ -169,9 +180,9 @@ func operationRequestFromContext(ctx context.Context) *OperationRequest {
 	if !ok || r == nil {
 		return nil
 	}
-	// always return a copy to avoid other middleware changing its value
 	return r.copy()
 }
+
 func (op *OperationRequest) copy() *OperationRequest {
 	r := *op
 	return &r
