@@ -69,7 +69,7 @@ func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	addExtraAttributes := validateCustomAttributes(&l.customAttributeAssigner)
 	var extraAttributes map[string]interface{}
 	if addExtraAttributes {
-		extraAttributes = (*l.customAttributeAssigner.AttributeInitializer)(w, r) // we don't want to return error from this, which is dangerous. Need error checking to make sure that each custom attribute is being taken care of by func..?
+		extraAttributes = (*l.customAttributeAssigner.AttributeInitializer)(w, r)
 	}
 
 	customWriter := &responseWriter{ResponseWriter: w}
@@ -92,19 +92,14 @@ func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (l *loggingMiddleware) BuildLoggingAttributes(ctx context.Context, r *http.Request, extra ...interface{}) []interface{} {
-	if len(l.source) == 0 {
-		l.source = "ApiRequestLog"
-	}
-
+	setSourceIfEmtpy(&l.source)
 	return BuildAttributes(ctx, l.source, r, extra...)
 }
 
 func BuildAttributes(ctx context.Context, source string, r *http.Request, extra ...interface{}) []interface{} {
-	if len(source) == 0 {
-		source = "ApiRequestLog"
-	}
-
+	setSourceIfEmtpy(&source)
 	md, ok := metadata.FromIncomingContext(ctx)
+
 	attributes := []interface{}{
 		"source", source,
 		"protocol", "HTTP",
@@ -174,5 +169,11 @@ func flattenAttributes(v interface{}) []interface{} {
 	}
 
 	return attrList
+}
 
+// sets default source "ApiRequestLog"
+func setSourceIfEmtpy(source *string) {
+	if len(*source) == 0 {
+		*source = "ApiRequestLog"
+	}
 }
