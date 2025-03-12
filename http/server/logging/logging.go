@@ -11,17 +11,16 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-// TODO (Tom): Add a logger wrapper in its own package
-// https://medium.com/@ansujain/building-a-logger-wrapper-in-go-with-support-for-multiple-logging-libraries-48092b826bee
-
-// more info about http handler here: https://pkg.go.dev/net/http#Handler
 type initFunc func(w http.ResponseWriter, r *http.Request) map[string]interface{}
 type loggingFunc func(w http.ResponseWriter, r *http.Request, attrs map[string]interface{}) map[string]interface{}
 type CustomAttributes struct {
-	//CustomAttributeKeys  []slog.Attr
 	AttributeInitializer *initFunc    // sets keys for custom attributes at the beginning of ServeHTTP()
 	AttributeAssigner    *loggingFunc // assigns values for custom attributes after request has completed
 }
+
+// TODO (Tom): Add a logger wrapper in its own package
+// https://medium.com/@ansujain/building-a-logger-wrapper-in-go-with-support-for-multiple-logging-libraries-48092b826bee
+// more info about http handler here: https://pkg.go.dev/net/http#Handler
 
 // If source is empty, it will be set to "ApiRequestLog"
 // If ANY fields in customAttributeAssigner are empty, or the struct itself is empty, extra attributes will not be assigned
@@ -131,7 +130,6 @@ func BuildAttributes(ctx context.Context, source string, r *http.Request, extra 
 	}
 
 	attributes = append(attributes, "headers", headers)
-	//attributes = append(attributes, extra...)
 	return attributes
 }
 
