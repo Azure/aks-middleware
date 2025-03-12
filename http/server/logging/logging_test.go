@@ -3,6 +3,7 @@ package logging
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -16,14 +17,14 @@ import (
 
 var _ = Describe("Httpmw", func() {
 	var (
-		router *mux.Router
-		//routerWithExtraLogging *mux.Router
-		buf        *bytes.Buffer
-		slogLogger *slog.Logger
-		// rgnameKey              string
-		// subIdKey               string
-		// resultType             string
-		// errorDetailsKey        string
+		router                 *mux.Router
+		routerWithExtraLogging *mux.Router
+		buf                    *bytes.Buffer
+		slogLogger             *slog.Logger
+		rgnameKey              string
+		subIdKey               string
+		resultTypeKey          string
+		errorDetailsKey        string
 	)
 
 	BeforeEach(func() {
@@ -46,48 +47,45 @@ var _ = Describe("Httpmw", func() {
 			w.WriteHeader(http.StatusOK)
 		})
 
-		// routerWithExtraLogging = mux.NewRouter()
-		// routerWithExtraLogging.Use(requestid.NewRequestIDMiddlewareWithExtractor(customExtractor))
-		// subIdKey := "subscriptionID"
-		// rgnameKey := "resourceGroupName"
-		// resultTypeKey := "resultType"
-		// errorDetailsKey := "errorDetails"
+		routerWithExtraLogging = mux.NewRouter()
+		routerWithExtraLogging.Use(requestid.NewRequestIDMiddlewareWithExtractor(customExtractor))
+		subIdKey = "subscriptionID"
+		rgnameKey = "resourceGroupName"
+		resultTypeKey = "resultType"
+		errorDetailsKey = "errorDetails"
 
-		// var testInitializer initFunc = func(w http.ResponseWriter, r *http.Request) map[string]interface{} {
-		// 	fmt.Println("in test initializer!!")
-		// 	attrMap := map[string]interface{}{
-		// 		subIdKey:        subIdKey + "value",
-		// 		rgnameKey:       rgnameKey + "value",
-		// 		resultTypeKey:   resultTypeKey + "value",
-		// 		errorDetailsKey: errorDetailsKey + "value",
-		// 	}
-		// 	return attrMap
-		// }
+		var testInitializer initFunc = func(w http.ResponseWriter, r *http.Request) map[string]interface{} {
+			fmt.Println("in test initializer!!")
+			attrMap := map[string]interface{}{
+				subIdKey:        subIdKey + "value",
+				rgnameKey:       rgnameKey + "value",
+				resultTypeKey:   resultTypeKey + "value",
+				errorDetailsKey: errorDetailsKey + "value",
+			}
+			return attrMap
+		}
 
-		// var testAssigner loggingFunc = func(w http.ResponseWriter, r *http.Request, attrMap map[string]interface{}) map[string]interface{} {
-		// 	// could overwrite some values based on request data
-		// 	// ex: get operation request from r
-		// 	fmt.Println("in test assigner!!")
-		// 	opreq := operationRequestFromContext(r.Context())
-		// 	attrMap[rgnameKey] = opreq.ResourceName
-		// 	attrMap[subIdKey] = opreq.SubscriptionID
-		// 	attrMap[resultTypeKey] = 2
-		// 	// don't set the error details if there was no error, shouldn't be an issue
-		// 	fmt.Println("returning from test assigner!!")
-		// 	return attrMap
-		// }
+		var testAssigner loggingFunc = func(w http.ResponseWriter, r *http.Request, attrMap map[string]interface{}) map[string]interface{} {
+			fmt.Println("in test assigner!!")
+			opreq := operationRequestFromContext(r.Context())
+			// Overwrite the extra attributes. These assignments update the map directly.
+			attrMap[rgnameKey] = opreq.ResourceName
+			attrMap[subIdKey] = opreq.SubscriptionID
+			attrMap[resultTypeKey] = 2
+			fmt.Println("returning from test assigner!!")
+			return attrMap
+		}
+		customAttributes := CustomAttributes{
+			AttributeInitializer: &testInitializer,
+			AttributeAssigner:    &testAssigner,
+		}
 
-		// customAttributes := CustomAttributes{
-		// 	AttributeInitializer: &testInitializer,
-		// 	AttributeAssigner:    &testAssigner,
-		// }
+		routerWithExtraLogging.Use(NewLogging(slogLogger, customAttributes))
 
-		// routerWithExtraLogging.Use(NewLogging(slogLogger, customAttributes))
-
-		// routerWithExtraLogging.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
-		// 	time.Sleep(10 * time.Millisecond)
-		// 	w.WriteHeader(http.StatusOK)
-		// })
+		routerWithExtraLogging.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
+			time.Sleep(10 * time.Millisecond)
+			w.WriteHeader(http.StatusOK)
+		})
 	})
 
 	Describe("LoggingMiddleware", func() {
@@ -122,26 +120,39 @@ var _ = Describe("Httpmw", func() {
 			Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
 		})
 
-		// It("should set values for extra attributes included for logging", func() {
-		// 	w := httptest.NewRecorder()
-		// 	req := httptest.NewRequest("GET", "/", nil)
-		// 	req.Header.Set(requestid.RequestAcsOperationIDHeader, "test-operation-id")
-		// 	req.Header.Set(requestid.RequestCorrelationIDHeader, "test-correlation-id")
-		// 	ctx := context.WithValue(context.Background(), rgnameKey, "test-rgname-value")
-		// 	ctx = context.WithValue(ctx, subIdKey, "test-subid-value")
-		// 	req.WithContext(ctx)
+		It("should set values for extra attributes included for logging", func() {
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest("GET", "/", nil)
+			req.Header.Set(requestid.RequestAcsOperationIDHeader, "test-operation-id")
+			req.Header.Set(requestid.RequestCorrelationIDHeader, "test-correlation-id")
 
-		// 	routerWithExtraLogging.ServeHTTP(w, req)
+			type ctxkey string
+			rgkey := ctxkey(rgnameKey)
+			subkey := ctxkey(subIdKey)
 
-		// 	Expect(buf.String()).To(ContainSubstring(`"operationid":"test-operation-id"`))
-		// 	Expect(buf.String()).To(ContainSubstring(`"correlationid":"test-correlation-id"`))
-		// 	Expect(buf.String()).ToNot(ContainSubstring(`"armclientrequestid"`))
+			ctx := context.Background()
+			ctx = context.WithValue(ctx, rgkey, "test-rgname-value")
+			ctx = context.WithValue(ctx, subkey, "test-subid-value")
+			opReq := &OperationRequest{
+				ResourceName:   "test-rgname-value",
+				SubscriptionID: "test-subid-value",
+			}
+			ctx = context.WithValue(ctx, operationRequestKey, opReq)
 
-		// 	// test extra values
-		// 	Expect(buf.String()).To(ContainSubstring(`"%s:%s"`, rgnameKey, "test-rgname-value"))
-		// 	Expect(buf.String()).To(ContainSubstring(`"%s:%s"`, subIdKey, "test-subid-value"))
-		// 	Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
-		// })
+			// Update the request with the prepared context.
+			updatedReq := req.WithContext(ctx)
+
+			routerWithExtraLogging.ServeHTTP(w, updatedReq)
+
+			Expect(buf.String()).To(ContainSubstring(`"operationid":"test-operation-id"`))
+			Expect(buf.String()).To(ContainSubstring(`"correlationid":"test-correlation-id"`))
+			Expect(buf.String()).ToNot(ContainSubstring(`"armclientrequestid"`))
+
+			// test extra values
+			Expect(buf.String()).To(ContainSubstring(`"%s:%s"`, rgnameKey, "test-rgname-value"))
+			Expect(buf.String()).To(ContainSubstring(`"%s:%s"`, subIdKey, "test-subid-value"))
+			Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
+		})
 	})
 })
 
@@ -152,15 +163,16 @@ type OperationRequest struct {
 
 type contextKey struct{}
 
+var operationRequestKey = contextKey{}
+
 func operationRequestFromContext(ctx context.Context) *OperationRequest {
-	r, ok := ctx.Value(contextKey{}).(*OperationRequest)
+	r, ok := ctx.Value(operationRequestKey).(*OperationRequest)
 	if !ok || r == nil {
 		return nil
 	}
-	// always return a copy to avoid other middleware change it's value
+	// always return a copy to avoid other middleware changing its value
 	return r.copy()
 }
-
 func (op *OperationRequest) copy() *OperationRequest {
 	r := *op
 	return &r
