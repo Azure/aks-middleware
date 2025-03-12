@@ -98,6 +98,10 @@ func (l *loggingMiddleware) BuildLoggingAttributes(ctx context.Context, r *http.
 }
 
 func BuildAttributes(ctx context.Context, source string, r *http.Request, extra ...interface{}) []interface{} {
+	if len(source) == 0 {
+		source = "ApiRequestLog"
+	}
+
 	md, ok := metadata.FromIncomingContext(ctx)
 	attributes := []interface{}{
 		"source", source,
@@ -119,21 +123,22 @@ func BuildAttributes(ctx context.Context, source string, r *http.Request, extra 
 	}
 
 	for _, e := range extra {
-		attributes = append(attributes, flattenAttributes(e)...)
+		flattened := flattenAttributes(e)
+		attributes = append(attributes, flattened...)
 	}
 
 	attributes = append(attributes, "headers", headers)
-	attributes = append(attributes, extra...)
+	//attributes = append(attributes, extra...)
 	return attributes
 }
 
-func (l *loggingMiddleware) LogRequestStart(ctx context.Context, r *http.Request, msg string, extraAttributes ...map[string]interface{}) {
+func (l *loggingMiddleware) LogRequestStart(ctx context.Context, r *http.Request, msg string, extraAttributes map[string]interface{}) {
 	attributes := l.BuildLoggingAttributes(ctx, r, extraAttributes)
 	l.logger.InfoContext(ctx, msg, attributes...)
 }
 
-func (l *loggingMiddleware) LogRequestEnd(ctx context.Context, r *http.Request, msg string, statusCode int, duration time.Duration, extraAttributes ...map[string]interface{}) {
-	attributes := l.BuildLoggingAttributes(ctx, r, "code", statusCode, "time_ms", duration.Milliseconds())
+func (l *loggingMiddleware) LogRequestEnd(ctx context.Context, r *http.Request, msg string, statusCode int, duration time.Duration, extraAttributes map[string]interface{}) {
+	attributes := l.BuildLoggingAttributes(ctx, r, "code", statusCode, "time_ms", duration.Milliseconds(), extraAttributes)
 	l.logger.InfoContext(ctx, msg, attributes...)
 }
 
@@ -156,9 +161,17 @@ func flattenAttributes(v interface{}) []interface{} {
 		return []interface{}{v}
 	}
 
-	out := make([]interface{}, 0, rv.Len()*2)
-	for _, key := range rv.MapKeys() {
-		out = append(out, key.Interface(), rv.MapIndex(key).Interface())
+	m, ok := v.(map[string]interface{})
+	if !ok {
+		return []interface{}{v}
 	}
-	return out
+
+	attrList := make([]interface{}, 0, len(m)*2)
+	for key, value := range m {
+		attrList = append(attrList, key)
+		attrList = append(attrList, value)
+	}
+
+	return attrList
+
 }

@@ -3,7 +3,6 @@ package logging
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -20,6 +19,7 @@ var _ = Describe("Httpmw", func() {
 		router                 *mux.Router
 		routerWithExtraLogging *mux.Router
 		buf                    *bytes.Buffer
+		buf2                   *bytes.Buffer
 		slogLogger             *slog.Logger
 		rgnameKey              string
 		subIdKey               string
@@ -55,7 +55,6 @@ var _ = Describe("Httpmw", func() {
 		errorDetailsKey = "errorDetails"
 
 		var testInitializer initFunc = func(w http.ResponseWriter, r *http.Request) map[string]interface{} {
-			fmt.Println("in test initializer!!")
 			attrMap := map[string]interface{}{
 				subIdKey:        subIdKey + "value",
 				rgnameKey:       rgnameKey + "value",
@@ -66,13 +65,12 @@ var _ = Describe("Httpmw", func() {
 		}
 
 		var testAssigner loggingFunc = func(w http.ResponseWriter, r *http.Request, attrMap map[string]interface{}) map[string]interface{} {
-			fmt.Println("in test assigner!!")
 			opreq := operationRequestFromContext(r.Context())
 			// Overwrite the extra attributes. These assignments update the map directly.
 			attrMap[rgnameKey] = opreq.ResourceName
 			attrMap[subIdKey] = opreq.SubscriptionID
+
 			attrMap[resultTypeKey] = 2
-			fmt.Println("returning from test assigner!!")
 			return attrMap
 		}
 		customAttributes := CustomAttributes{
@@ -80,7 +78,9 @@ var _ = Describe("Httpmw", func() {
 			AttributeAssigner:    &testAssigner,
 		}
 
-		routerWithExtraLogging.Use(NewLogging(slogLogger, customAttributes))
+		buf2 = new(bytes.Buffer)
+		slogLogger2 := slog.New(slog.NewJSONHandler(buf2, nil))
+		routerWithExtraLogging.Use(NewLogging(slogLogger2, customAttributes))
 
 		routerWithExtraLogging.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
 			time.Sleep(10 * time.Millisecond)
@@ -141,16 +141,15 @@ var _ = Describe("Httpmw", func() {
 
 			// Update the request with the prepared context.
 			updatedReq := req.WithContext(ctx)
-
 			routerWithExtraLogging.ServeHTTP(w, updatedReq)
 
-			Expect(buf.String()).To(ContainSubstring(`"operationid":"test-operation-id"`))
-			Expect(buf.String()).To(ContainSubstring(`"correlationid":"test-correlation-id"`))
-			Expect(buf.String()).ToNot(ContainSubstring(`"armclientrequestid"`))
+			Expect(buf2.String()).To(ContainSubstring(`"operationid":"test-operation-id"`))
+			Expect(buf2.String()).To(ContainSubstring(`"correlationid":"test-correlation-id"`))
+			Expect(buf2.String()).ToNot(ContainSubstring(`"armclientrequestid"`))
 
 			// test extra values
-			Expect(buf.String()).To(ContainSubstring(`"%s:%s"`, rgnameKey, "test-rgname-value"))
-			Expect(buf.String()).To(ContainSubstring(`"%s:%s"`, subIdKey, "test-subid-value"))
+			Expect(buf2.String()).To(ContainSubstring(`"%s":"%s"`, rgnameKey, "test-rgname-value"))
+			Expect(buf2.String()).To(ContainSubstring(`"%s":"%s"`, subIdKey, "test-subid-value"))
 			Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
 		})
 	})
