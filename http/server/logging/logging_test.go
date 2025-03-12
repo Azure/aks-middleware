@@ -159,6 +159,8 @@ var _ = Describe("Httpmw", func() {
 			// check extra attributes
 			Expect(buf2.String()).To(ContainSubstring(`"%s":"%s"`, rgnameKey, "test-rgname-value"))
 			Expect(buf2.String()).To(ContainSubstring(`"%s":"%s"`, subIdKey, "test-subid-value"))
+			Expect(buf2.String()).To(ContainSubstring(`"%s":"%s"`, errorDetailsKey, errorDetailsKey+"value"))
+			Expect(buf2.String()).To(ContainSubstring(`"%s":%d`, resultTypeKey, 2))
 			Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
 		})
 	})
