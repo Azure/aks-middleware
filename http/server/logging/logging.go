@@ -14,8 +14,8 @@ import (
 type initFunc func(w http.ResponseWriter, r *http.Request) map[string]interface{}
 type loggingFunc func(w http.ResponseWriter, r *http.Request, attrs map[string]interface{}) map[string]interface{}
 type CustomAttributes struct {
-	AttributeInitializer *initFunc    // sets keys for custom attributes at the beginning of ServeHTTP()
-	AttributeAssigner    *loggingFunc // assigns values for custom attributes after request has completed
+	AttributeInitializer initFunc    // sets keys for custom attributes at the beginning of ServeHTTP()
+	AttributeAssigner    loggingFunc // assigns values for custom attributes after request has completed
 }
 
 // TODO (Tom): Add a logger wrapper in its own package
@@ -66,10 +66,10 @@ func (w *responseWriter) Write(b []byte) (int, error) {
 
 func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// If any fields in CustomAttributes are nil, do not call them to avoid errors
-	addExtraAttributes := validateCustomAttributes(&l.customAttributeAssigner)
+	addExtraAttributes := shouldLogCustomAttributes(&l.customAttributeAssigner)
 	var extraAttributes map[string]interface{}
 	if addExtraAttributes {
-		extraAttributes = (*l.customAttributeAssigner.AttributeInitializer)(w, r)
+		extraAttributes = (l.customAttributeAssigner.AttributeInitializer)(w, r)
 	}
 
 	customWriter := &responseWriter{ResponseWriter: w}
@@ -84,7 +84,7 @@ func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	var updatedAttrs map[string]interface{}
 	if addExtraAttributes {
-		updatedAttrs = (*l.customAttributeAssigner.AttributeAssigner)(w, r, extraAttributes)
+		updatedAttrs = (l.customAttributeAssigner.AttributeAssigner)(w, r, extraAttributes)
 	}
 
 	l.LogRequestEnd(ctx, r, "RequestEnd", customWriter.statusCode, latency, updatedAttrs)
@@ -139,7 +139,7 @@ func (l *loggingMiddleware) LogRequestEnd(ctx context.Context, r *http.Request, 
 }
 
 // Returns true if extra attributes should be logged, false otherwise
-func validateCustomAttributes(attrStruct *CustomAttributes) bool {
+func shouldLogCustomAttributes(attrStruct *CustomAttributes) bool {
 	if attrStruct == nil {
 		return false
 	} else if attrStruct.AttributeInitializer == nil {
