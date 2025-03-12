@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"reflect"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -64,7 +65,6 @@ func (w *responseWriter) Write(b []byte) (int, error) {
 func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// If any fields in CustomAttributes are nil, do not call them to avoid errors
 	addExtraAttributes := validateCustomAttributes(&l.customAttributeAssigner)
-
 	var extraAttributes map[string]interface{}
 	if addExtraAttributes {
 		extraAttributes = (*l.customAttributeAssigner.AttributeInitializer)(w, r) // we don't want to return error from this, which is dangerous. Need error checking to make sure that each custom attribute is being taken care of by func..?
@@ -93,12 +93,13 @@ func (l *loggingMiddleware) BuildLoggingAttributes(ctx context.Context, r *http.
 	if len(l.source) == 0 {
 		l.source = "ApiRequestLog"
 	}
-	return BuildAttributes(ctx, r, l.source, extra)
+
+	return BuildAttributes(ctx, l.source, r, extra...)
 }
 
-func BuildAttributes(ctx context.Context, r *http.Request, source string, extra ...interface{}) []interface{} {
+func BuildAttributes(ctx context.Context, source string, r *http.Request, extra ...interface{}) []interface{} {
 	md, ok := metadata.FromIncomingContext(ctx)
-	attributes := []interface{}{ //TODO: should this be called only once? Why is this being set on every LogRequestStart and LogRequestEnd?
+	attributes := []interface{}{
 		"source", source,
 		"protocol", "HTTP",
 		"method_type", "unary",
@@ -117,17 +118,21 @@ func BuildAttributes(ctx context.Context, r *http.Request, source string, extra 
 		}
 	}
 
+	for _, e := range extra {
+		attributes = append(attributes, flattenAttributes(e)...)
+	}
+
 	attributes = append(attributes, "headers", headers)
 	attributes = append(attributes, extra...)
 	return attributes
 }
 
 func (l *loggingMiddleware) LogRequestStart(ctx context.Context, r *http.Request, msg string, extraAttributes ...map[string]interface{}) {
-	attributes := l.BuildLoggingAttributes(ctx, r)
+	attributes := l.BuildLoggingAttributes(ctx, r, extraAttributes)
 	l.logger.InfoContext(ctx, msg, attributes...)
 }
 
-func (l *loggingMiddleware) LogRequestEnd(ctx context.Context, r *http.Request, msg string, statusCode int, duration time.Duration, extraAttributes map[string]interface{}) {
+func (l *loggingMiddleware) LogRequestEnd(ctx context.Context, r *http.Request, msg string, statusCode int, duration time.Duration, extraAttributes ...map[string]interface{}) {
 	attributes := l.BuildLoggingAttributes(ctx, r, "code", statusCode, "time_ms", duration.Milliseconds())
 	l.logger.InfoContext(ctx, msg, attributes...)
 }
@@ -143,4 +148,17 @@ func validateCustomAttributes(attrStruct *CustomAttributes) bool {
 	} else {
 		return true
 	}
+}
+
+func flattenAttributes(v interface{}) []interface{} {
+	rv := reflect.ValueOf(v)
+	if rv.Kind() != reflect.Map {
+		return []interface{}{v}
+	}
+
+	out := make([]interface{}, 0, rv.Len()*2)
+	for _, key := range rv.MapKeys() {
+		out = append(out, key.Interface(), rv.MapIndex(key).Interface())
+	}
+	return out
 }
