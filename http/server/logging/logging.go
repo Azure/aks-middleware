@@ -23,12 +23,15 @@ type CustomAttributes struct {
 	AttributeAssigner    *loggingFunc // assigns values for custom attributes after request has completed
 }
 
-func NewLogging(logger *slog.Logger, customAttributeAssigner CustomAttributes) mux.MiddlewareFunc {
+// If source is empty, it will be set to "ApiRequestLog"
+// If ANY fields in customAttributeAssigner are empty, or the struct itself is empty, extra attributes will not be assigned
+func NewLogging(logger *slog.Logger, source string, customAttributeAssigner CustomAttributes) mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return &loggingMiddleware{
 			next:                    next,
 			now:                     time.Now,
 			logger:                  *logger,
+			source:                  source,
 			customAttributeAssigner: customAttributeAssigner,
 		}
 	}
