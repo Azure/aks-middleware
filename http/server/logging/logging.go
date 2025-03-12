@@ -151,6 +151,7 @@ func validateCustomAttributes(attrStruct *CustomAttributes) bool {
 	}
 }
 
+// Adds map k:v pairs as separate entires in []interface{} list for logging
 func flattenAttributes(v interface{}) []interface{} {
 	rv := reflect.ValueOf(v)
 	if rv.Kind() != reflect.Map {
@@ -164,8 +165,7 @@ func flattenAttributes(v interface{}) []interface{} {
 
 	attrList := make([]interface{}, 0, len(m)*2)
 	for key, value := range m {
-		attrList = append(attrList, key)
-		attrList = append(attrList, value)
+		attrList = append(attrList, key, value)
 	}
 
 	return attrList
