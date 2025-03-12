@@ -74,8 +74,8 @@ var _ = Describe("Httpmw", func() {
 			return attrMap
 		}
 		customAttributes := CustomAttributes{
-			AttributeInitializer: &testInitializer,
-			AttributeAssigner:    &testAssigner,
+			AttributeInitializer: testInitializer,
+			AttributeAssigner:    testAssigner,
 		}
 
 		buf2 = new(bytes.Buffer)
