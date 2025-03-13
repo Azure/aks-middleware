@@ -18,58 +18,65 @@ type OtelConfig struct {
 }
 
 func (l *loggingMiddleware) sendOtelAuditEvent(ctx context.Context, statusCode int, req *http.Request) {
-	if l.otelConfig == nil || l.otelConfig.Client == nil {
-		l.logger.Error("otel configuration or client is nil")
-		return
-	}
+    if l.otelConfig == nil || l.otelConfig.Client == nil {
+        l.logger.Error("otel configuration or client is nil")
+        return
+    }
 
-	msg := createOtelAuditEvent(l.logger, statusCode, req, l.otelConfig)
-	l.logger.Info("sending audit logs")
-	if err := l.otelConfig.Client.Send(ctx, msg); err != nil {
-		l.logger.Error("failed to send audit event", "error", err)
-	} else {
-		l.logger.Info("audit event sent successfully")
-	}
+    msg, err := createOtelAuditEvent(l.logger, statusCode, req, l.otelConfig)
+    if err != nil {
+        l.logger.Error("failed to create audit event", "error", err)
+        return
+    }
+
+    l.logger.Info("sending audit logs")
+    if err := l.otelConfig.Client.Send(ctx, msg); err != nil {
+        l.logger.Error("failed to send audit event", "error", err)
+    } else {
+        l.logger.Info("audit event sent successfully")
+    }
 }
 
-func createOtelAuditEvent(logger *slog.Logger, statusCode int, req *http.Request, otelConfig *OtelConfig) msgs.Msg {
-	host, _, err := net.SplitHostPort(req.RemoteAddr)
-	if err != nil {
-		logger.Error("failed to split host and port", "error", err)
-	}
-	addr, err := msgs.ParseAddr(host)
-	if err != nil {
-		logger.Error("failed to parse address", "error", err)
-	}
+func createOtelAuditEvent(logger *slog.Logger, statusCode int, req *http.Request, otelConfig *OtelConfig) (msgs.Msg, error) {
+    host, _, err := net.SplitHostPort(req.RemoteAddr)
+    if err != nil {
+        logger.Error("failed to split host and port", "error", err)
+        return msgs.Msg{}, err
+    }
+    addr, err := msgs.ParseAddr(host)
+    if err != nil {
+        logger.Error("failed to parse address", "error", err)
+        return msgs.Msg{}, err
+    }
 
-	tr := map[string][]msgs.TargetResourceEntry{
-		"ResourceType": {
-			{
-				Name:   req.RequestURI,
-				Region: req.Header.Get("Region"), // Assume the region is in the header
-			},
-		},
-	}
+    tr := map[string][]msgs.TargetResourceEntry{
+        "ResourceType": {
+            {
+                Name:   req.RequestURI,
+                Region: req.Header.Get("Region"), // Assume the region is in the header
+            },
+        },
+    }
 
-	record := msgs.Record{
-		CallerIpAddress:              addr,
-		CallerIdentities:             getCallerIdentities(req),
-		OperationCategories:          []msgs.OperationCategory{getOperationCategory(req.Method, otelConfig.CustomOperationDescs)},
-		OperationCategoryDescription: getOperationCategoryDescription(req.Method, otelConfig.CustomOperationDescs),
-		TargetResources:              tr,
-		CallerAccessLevels:           []string{"NA"},
-		OperationAccessLevel:         otelConfig.OperationAccessLevel,
-		OperationName:                req.Method,
-		CallerAgent:                  req.UserAgent(),
-		OperationType:                getOperationType(req.Method),
-		OperationResult:              getOperationResult(statusCode),
-		OperationResultDescription:   getOperationResultDescription(statusCode),
-	}
+    record := msgs.Record{
+        CallerIpAddress:              addr,
+        CallerIdentities:             getCallerIdentities(req),
+        OperationCategories:          []msgs.OperationCategory{getOperationCategory(req.Method, otelConfig.CustomOperationDescs)},
+        OperationCategoryDescription: getOperationCategoryDescription(req.Method, otelConfig.CustomOperationDescs),
+        TargetResources:              tr,
+        CallerAccessLevels:           []string{"NA"},
+        OperationAccessLevel:         otelConfig.OperationAccessLevel,
+        OperationName:                req.Method,
+        CallerAgent:                  req.UserAgent(),
+        OperationType:                getOperationType(req.Method),
+        OperationResult:              getOperationResult(statusCode),
+        OperationResultDescription:   getOperationResultDescription(statusCode),
+    }
 
-	return msgs.Msg{
-		Type:   msgs.ControlPlane,
-		Record: record,
-	}
+    return msgs.Msg{
+        Type:   msgs.ControlPlane,
+        Record: record,
+    }, nil
 }
 
 func getCallerIdentities(req *http.Request) map[msgs.CallerIdentityType][]msgs.CallerIdentityEntry {
