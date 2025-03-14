@@ -40,7 +40,7 @@ var _ = Describe("Httpmw", func() {
 			}
 		}
 		router.Use(requestid.NewRequestIDMiddlewareWithExtractor(customExtractor))
-		router.Use(NewLogging(slogLogger, "", CustomAttributes{}))
+		router.Use(NewLogging(slogLogger, "", AttributeManager{}))
 
 		router.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
 			time.Sleep(10 * time.Millisecond)
@@ -73,7 +73,7 @@ var _ = Describe("Httpmw", func() {
 			attrMap[resultTypeKey] = 2
 			return attrMap
 		}
-		customAttributes := CustomAttributes{
+		customAttributes := AttributeManager{
 			AttributeInitializer: testInitializer,
 			AttributeAssigner:    testAssigner,
 		}

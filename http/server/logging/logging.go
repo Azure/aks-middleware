@@ -13,7 +13,7 @@ import (
 
 type initFunc func(w http.ResponseWriter, r *http.Request) map[string]interface{}
 type loggingFunc func(w http.ResponseWriter, r *http.Request, attrs map[string]interface{}) map[string]interface{}
-type CustomAttributes struct {
+type AttributeManager struct {
 	AttributeInitializer initFunc    // sets keys for custom attributes at the beginning of ServeHTTP()
 	AttributeAssigner    loggingFunc // assigns values for custom attributes after request has completed
 }
@@ -23,15 +23,15 @@ type CustomAttributes struct {
 // more info about http handler here: https://pkg.go.dev/net/http#Handler
 
 // If source is empty, it will be set to "ApiRequestLog"
-// If ANY fields in customAttributeAssigner are empty, or the struct itself is empty, extra attributes will not be assigned
-func NewLogging(logger *slog.Logger, source string, customAttributeAssigner CustomAttributes) mux.MiddlewareFunc {
+// If ANY fields in customAttributeAssigner are empty, or the struct itself is empty, default initializer and assigner will be set
+func NewLogging(logger *slog.Logger, source string, customAttributeAssigner AttributeManager) mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return &loggingMiddleware{
-			next:                    next,
-			now:                     time.Now,
-			logger:                  *logger,
-			source:                  source,
-			customAttributeAssigner: customAttributeAssigner,
+			next:                next,
+			now:                 time.Now,
+			logger:              *logger,
+			source:              source,
+			customAttributeInfo: customAttributeAssigner,
 		}
 	}
 }
@@ -40,11 +40,11 @@ func NewLogging(logger *slog.Logger, source string, customAttributeAssigner Cust
 var _ http.Handler = &loggingMiddleware{}
 
 type loggingMiddleware struct {
-	next                    http.Handler
-	now                     func() time.Time
-	logger                  slog.Logger
-	source                  string
-	customAttributeAssigner CustomAttributes
+	next                http.Handler
+	now                 func() time.Time
+	logger              slog.Logger
+	source              string
+	customAttributeInfo AttributeManager
 }
 
 type responseWriter struct {
@@ -66,11 +66,13 @@ func (w *responseWriter) Write(b []byte) (int, error) {
 
 func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// If any fields in CustomAttributes are nil, do not call them to avoid errors
-	addExtraAttributes := shouldLogCustomAttributes(&l.customAttributeAssigner)
-	var extraAttributes map[string]interface{}
-	if addExtraAttributes {
-		extraAttributes = (l.customAttributeAssigner.AttributeInitializer)(w, r)
+	setDefaults := attributeFunctionsNotSet(&l.customAttributeInfo)
+
+	if setDefaults {
+		setDefaultInitializerAndAssigner(&l.customAttributeInfo, l.source)
 	}
+
+	extraAttributes := (l.customAttributeInfo.AttributeInitializer)(w, r)
 
 	customWriter := &responseWriter{ResponseWriter: w}
 	startTime := l.now()
@@ -81,34 +83,19 @@ func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	endTime := l.now()
 
 	latency := endTime.Sub(startTime)
-
-	var updatedAttrs map[string]interface{}
-	if addExtraAttributes {
-		updatedAttrs = (l.customAttributeAssigner.AttributeAssigner)(w, r, extraAttributes)
-	}
+	updatedAttrs := (l.customAttributeInfo.AttributeAssigner)(w, r, extraAttributes)
 
 	l.LogRequestEnd(ctx, r, "RequestEnd", customWriter.statusCode, latency, updatedAttrs)
 	l.LogRequestEnd(ctx, r, "finished call", customWriter.statusCode, latency, updatedAttrs)
 }
 
 func (l *loggingMiddleware) BuildLoggingAttributes(ctx context.Context, r *http.Request, extra ...interface{}) []interface{} {
-	setSourceIfEmtpy(&l.source)
+	setSourceIfEmpty(&l.source)
 	return BuildAttributes(ctx, l.source, r, extra...)
 }
 
 func BuildAttributes(ctx context.Context, source string, r *http.Request, extra ...interface{}) []interface{} {
-	setSourceIfEmtpy(&source)
 	md, ok := metadata.FromIncomingContext(ctx)
-
-	attributes := []interface{}{
-		"source", source,
-		"protocol", "HTTP",
-		"method_type", "unary",
-		"component", "server",
-		"method", r.Method,
-		"service", r.Host,
-		"url", r.URL.String(),
-	}
 
 	headers := make(map[string]string)
 	if ok {
@@ -119,6 +106,7 @@ func BuildAttributes(ctx context.Context, source string, r *http.Request, extra 
 		}
 	}
 
+	attributes := flattenAttributes(defaultAttributes(source, r))
 	for _, e := range extra {
 		flattened := flattenAttributes(e)
 		attributes = append(attributes, flattened...)
@@ -139,15 +127,27 @@ func (l *loggingMiddleware) LogRequestEnd(ctx context.Context, r *http.Request, 
 }
 
 // Returns true if extra attributes should be logged, false otherwise
-func shouldLogCustomAttributes(attrStruct *CustomAttributes) bool {
-	if attrStruct == nil {
-		return false
-	} else if attrStruct.AttributeInitializer == nil {
-		return false
-	} else if attrStruct.AttributeAssigner == nil {
-		return false
-	} else {
+func attributeFunctionsNotSet(attrStruct *AttributeManager) bool {
+	if attrStruct == nil || attrStruct.AttributeInitializer == nil || attrStruct.AttributeAssigner == nil {
 		return true
+	} else {
+		return false
+	}
+}
+
+// Sets a default Initializer and Assigner function for Attribute Manager. Default attributes will be set in BuildAttributes()
+func setDefaultInitializerAndAssigner(attributeManager *AttributeManager, source string) {
+	defaultInitializer := func(w http.ResponseWriter, r *http.Request) map[string]interface{} {
+		setSourceIfEmpty(&source)
+		return nil
+	}
+	attributeManager.AttributeInitializer = defaultInitializer
+
+	defaultAssigner := func(w http.ResponseWriter, r *http.Request, attrs map[string]interface{}) map[string]interface{} {
+		return make(map[string]interface{}) // returning empty map because BuildAttributes sets default attributes regardless of default or user-defined assigner
+	}
+	if attributeManager.AttributeAssigner == nil {
+		attributeManager.AttributeAssigner = defaultAssigner
 	}
 }
 
@@ -172,8 +172,21 @@ func flattenAttributes(v interface{}) []interface{} {
 }
 
 // sets default source "ApiRequestLog"
-func setSourceIfEmtpy(source *string) {
+func setSourceIfEmpty(source *string) {
 	if len(*source) == 0 {
 		*source = "ApiRequestLog"
+	}
+}
+
+// default attributes that are set
+func defaultAttributes(source string, r *http.Request) map[string]interface{} {
+	return map[string]interface{}{
+		"source":      &source,
+		"protocol":    "HTTP",
+		"method_type": "unary",
+		"component":   "server",
+		"method":      r.Method,
+		"service":     r.Host,
+		"url":         r.URL.String(),
 	}
 }
