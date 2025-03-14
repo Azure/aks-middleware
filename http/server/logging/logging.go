@@ -83,7 +83,7 @@ func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	endTime := l.now()
 
 	latency := endTime.Sub(startTime)
-	updatedAttrs := (l.customAttributeInfo.AttributeAssigner)(w, r, extraAttributes)
+	updatedAttrs := (l.customAttributeInfo.AttributeAssigner)(customWriter, r, extraAttributes)
 
 	l.LogRequestEnd(ctx, r, "RequestEnd", customWriter.statusCode, latency, updatedAttrs)
 	l.LogRequestEnd(ctx, r, "finished call", customWriter.statusCode, latency, updatedAttrs)
