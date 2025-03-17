@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Azure/aks-middleware/http/server/requestid"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/gorilla/mux"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -231,6 +232,36 @@ var _ = Describe("Httpmw", func() {
 			Expect(buf4.String()).ToNot(ContainSubstring(`"hello":"world"`)) // assigner was set by user without initializer, so this should be overwritten by default function
 
 			routerWithoutAssigner.ServeHTTP(w, req)
+		})
+	})
+
+	Describe("Test Helpers", func() {
+		It("test setDefaultInitializerAndAssigner()", func() {
+			// empty Attribute Manager, source not set
+			attrMgr := &AttributeManager{}
+			source := to.Ptr("")
+			setDefaultInitializerAndAssigner(attrMgr, source)
+			Expect(attrMgr.AttributeAssigner).ToNot(BeNil())
+			Expect(attrMgr.AttributeInitializer).ToNot(BeNil())
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest("GET", "/", nil)
+			initMap := attrMgr.AttributeInitializer(w, req)
+			Expect(initMap).To(BeEmpty())
+			finalMap := attrMgr.AttributeAssigner(w, req, initMap)
+			Expect(finalMap).To(BeEmpty())
+			Expect(*source).To(Equal("ApiRequestLog"))
+		})
+
+		It("Test flattenAttributes()", func() {
+			attrMap := map[string]interface{}{
+				"hello":   "world",
+				"latency": 2,
+			}
+			attrList := flattenAttributes(attrMap)
+			Expect(attrList[0]).To(Equal("hello"))
+			Expect(attrList[1]).To(Equal("world"))
+			Expect(attrList[2]).To(Equal("latency"))
+			Expect(attrList[3]).To(Equal(2))
 		})
 	})
 })
