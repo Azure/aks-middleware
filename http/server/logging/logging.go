@@ -70,7 +70,8 @@ func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	setDefaults := attributeFunctionsNotSet(&l.customAttributeInfo)
 
 	if setDefaults {
-		setDefaultInitializerAndAssigner(&l.customAttributeInfo, l.source)
+		fmt.Println("Setting default initializer and assigner!!!")
+		setDefaultInitializerAndAssigner(&l.customAttributeInfo, &l.source)
 	}
 
 	extraAttributes := (l.customAttributeInfo.AttributeInitializer)(w, r)
@@ -88,6 +89,7 @@ func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	updatedAttrs["code"] = customWriter.statusCode
 	updatedAttrs["time_ms"] = latency.Milliseconds()
+	fmt.Println("calling log request end")
 	l.LogRequestEnd(ctx, r, "RequestEnd", updatedAttrs)
 	l.LogRequestEnd(ctx, r, "finished call", updatedAttrs)
 }
@@ -114,7 +116,6 @@ func BuildAttributes(ctx context.Context, source string, r *http.Request, extra 
 	attributes = append(attributes, flattened...)
 
 	attributes = append(attributes, "headers", headers)
-	fmt.Println("updated attrs: ", attributes)
 	return attributes
 }
 
@@ -138,10 +139,14 @@ func attributeFunctionsNotSet(attrStruct *AttributeManager) bool {
 }
 
 // Sets a default Initializer and Assigner function for Attribute Manager. Default attributes will be set in BuildAttributes()
-func setDefaultInitializerAndAssigner(attributeManager *AttributeManager, source string) {
+func setDefaultInitializerAndAssigner(attributeManager *AttributeManager, source *string) {
+	if attributeManager == nil {
+		attributeManager = &AttributeManager{}
+	}
+
 	defaultInitializer := func(w http.ResponseWriter, r *http.Request) map[string]interface{} {
-		setSourceIfEmpty(&source)
-		return nil
+		setSourceIfEmpty(source)
+		return make(map[string]interface{})
 	}
 	attributeManager.AttributeInitializer = defaultInitializer
 
@@ -149,7 +154,6 @@ func setDefaultInitializerAndAssigner(attributeManager *AttributeManager, source
 		return make(map[string]interface{}) // returning empty map because BuildAttributes sets default attributes regardless of default or user-defined assigner
 	}
 	attributeManager.AttributeAssigner = defaultAssigner
-
 }
 
 // Adds map k:v pairs as separate entires in []interface{} list for logging
