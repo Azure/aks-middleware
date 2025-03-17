@@ -15,120 +15,112 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+// Holds the configuration for each test routers
+type routerConfig struct {
+	buf     *bytes.Buffer
+	logger  *slog.Logger
+	source  string
+	attrMgr AttributeManager
+}
+
+const (
+	subIdKey        = "subscriptionID"
+	rgnameKey       = "resourceGroupName"
+	resultTypeKey   = "resultType"
+	errorDetailsKey = "errorDetails"
+)
+
 var _ = Describe("Httpmw", func() {
 	var (
-		router                   *mux.Router
-		routerWithoutInitializer *mux.Router
-		routerWithExtraLogging   *mux.Router
-		routerWithoutAssigner    *mux.Router
-		buf                      *bytes.Buffer
-		buf3                     *bytes.Buffer
-		buf4                     *bytes.Buffer
-		buf2                     *bytes.Buffer
-		slogLogger               *slog.Logger
-		rgnameKey                string
-		subIdKey                 string
-		resultTypeKey            string
-		errorDetailsKey          string
-	)
-
-	BeforeEach(func() {
-		buf = new(bytes.Buffer)
-		slogLogger = slog.New(slog.NewJSONHandler(buf, nil))
-
-		router = mux.NewRouter()
-
-		customExtractor := func(r *http.Request) map[string]string {
+		customExtractor = func(r *http.Request) map[string]string {
 			return map[string]string{
 				string(requestid.CorrelationIDKey): r.Header.Get(requestid.RequestCorrelationIDHeader),
 				string(requestid.OperationIDKey):   r.Header.Get(requestid.RequestAcsOperationIDHeader),
 			}
 		}
-		router.Use(requestid.NewRequestIDMiddlewareWithExtractor(customExtractor))
-		router.Use(NewLogging(slogLogger, "", AttributeManager{}))
+	)
 
-		router.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
+	routerCfg := map[string]*routerConfig{
+		"default": {
+			source:  "ApiRequestLog",
+			attrMgr: AttributeManager{},
+		},
+		"without-initializer": {
+			source: "ApiRequestLog",
+			// only assigner provided
+			attrMgr: AttributeManager{
+				AttributeAssigner: func(w http.ResponseWriter, r *http.Request, attrs map[string]interface{}) map[string]interface{} {
+					return map[string]interface{}{"hello": "world"}
+				},
+			},
+		},
+		"without-assigner": {
+			source: "ApiRequestLog",
+			// only initializer provided
+			attrMgr: AttributeManager{
+				AttributeInitializer: func(w http.ResponseWriter, r *http.Request) map[string]interface{} {
+					return map[string]interface{}{"hello": "world"}
+				},
+			},
+		},
+		"extra-logging": {
+			source: "customSource",
+			attrMgr: AttributeManager{
+				AttributeInitializer: func(w http.ResponseWriter, r *http.Request) map[string]interface{} {
+					return map[string]interface{}{
+						"subscriptionID":    "defaultSubIDvalue",
+						"resourceGroupName": "defaultRGnamevalue",
+						"resultType":        "defaultResultTypevalue",
+						"errorDetails":      "defaultErrorDetailsvalue",
+					}
+				},
+				AttributeAssigner: func(w http.ResponseWriter, r *http.Request, attrMap map[string]interface{}) map[string]interface{} {
+					opReq := operationRequestFromContext(r.Context())
+					if opReq != nil {
+						attrMap["resourceGroupName"] = opReq.ResourceName
+						attrMap["subscriptionID"] = opReq.SubscriptionID
+					}
+					attrMap["resultType"] = 2
+					return attrMap
+				},
+			},
+		},
+	}
+
+	buildRouter := func(cfg *routerConfig) *mux.Router {
+		r := mux.NewRouter()
+		r.Use(requestid.NewRequestIDMiddlewareWithExtractor(customExtractor))
+
+		cfg.buf = new(bytes.Buffer)
+		cfg.logger = slog.New(slog.NewJSONHandler(cfg.buf, nil))
+
+		r.Use(NewLogging(cfg.logger, cfg.source, cfg.attrMgr))
+		r.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 			time.Sleep(10 * time.Millisecond)
 			w.WriteHeader(http.StatusOK)
 		})
+		return r
+	}
 
-		// Router without Initializer function
-		routerWithoutInitializer = mux.NewRouter()
-		routerWithoutInitializer.Use(requestid.NewRequestIDMiddlewareWithExtractor(customExtractor))
-		buf3 = new(bytes.Buffer)
-		slogLogger3 := slog.New(slog.NewJSONHandler(buf3, nil))
-		routerWithoutInitializer.Use(NewLogging(slogLogger3, "", AttributeManager{AttributeAssigner: func(w http.ResponseWriter, r *http.Request, attrs map[string]interface{}) map[string]interface{} {
-			return map[string]interface{}{"hello": "world"}
-		}}))
-		routerWithoutInitializer.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
-			time.Sleep(10 * time.Millisecond)
-			w.WriteHeader(http.StatusOK)
-		})
+	// For demonstration, create a map of routers by name.
+	routersMap := map[string]*mux.Router{}
 
-		// Router without Assigner function
-		routerWithoutAssigner = mux.NewRouter()
-		routerWithoutAssigner.Use(requestid.NewRequestIDMiddlewareWithExtractor(customExtractor))
-		buf4 = new(bytes.Buffer)
-		slogLogger4 := slog.New(slog.NewJSONHandler(buf4, nil))
-		routerWithoutAssigner.Use(NewLogging(slogLogger4, "", AttributeManager{AttributeInitializer: func(w http.ResponseWriter, r *http.Request) map[string]interface{} {
-			return map[string]interface{}{"hello": "world"}
-		}}))
-		routerWithoutAssigner.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
-			time.Sleep(10 * time.Millisecond)
-			w.WriteHeader(http.StatusOK)
-		})
-
-		// Router with extra logging attributes defined
-		routerWithExtraLogging = mux.NewRouter()
-		routerWithExtraLogging.Use(requestid.NewRequestIDMiddlewareWithExtractor(customExtractor))
-		subIdKey = "subscriptionID"
-		rgnameKey = "resourceGroupName"
-		resultTypeKey = "resultType"
-		errorDetailsKey = "errorDetails"
-
-		var testInitializer initFunc = func(w http.ResponseWriter, r *http.Request) map[string]interface{} {
-			attrMap := map[string]interface{}{
-				subIdKey:        subIdKey + "value",
-				rgnameKey:       rgnameKey + "value",
-				resultTypeKey:   resultTypeKey + "value",
-				errorDetailsKey: errorDetailsKey + "value",
-			}
-			return attrMap
+	BeforeEach(func() {
+		for name, cfg := range routerCfg {
+			routersMap[name] = buildRouter(cfg)
 		}
-
-		var testAssigner loggingFunc = func(w http.ResponseWriter, r *http.Request, attrMap map[string]interface{}) map[string]interface{} {
-			opreq := operationRequestFromContext(r.Context())
-			// Overwrite the extra attributes. These assignments update the map directly.
-			attrMap[rgnameKey] = opreq.ResourceName
-			attrMap[subIdKey] = opreq.SubscriptionID
-
-			attrMap[resultTypeKey] = 2
-			return attrMap
-		}
-		customAttributes := AttributeManager{
-			AttributeInitializer: testInitializer,
-			AttributeAssigner:    testAssigner,
-		}
-
-		buf2 = new(bytes.Buffer)
-		slogLogger2 := slog.New(slog.NewJSONHandler(buf2, nil))
-		routerWithExtraLogging.Use(NewLogging(slogLogger2, "customSource", customAttributes))
-
-		routerWithExtraLogging.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
-			time.Sleep(10 * time.Millisecond)
-			w.WriteHeader(http.StatusOK)
-		})
 	})
 
 	Describe("LoggingMiddleware", func() {
 		It("should log and return OK status", func() {
 			w := httptest.NewRecorder()
 			req := httptest.NewRequest("GET", "/", nil)
+			routersMap["default"].ServeHTTP(w, req)
 
-			router.ServeHTTP(w, req)
-
-			Expect(buf.String()).To(ContainSubstring("finished call"))
-			Expect(buf.String()).To(ContainSubstring(`"source":"ApiRequestLog"`))
+			cfg := routerCfg["default"]
+			buf := cfg.buf
+			Expect(cfg.buf).To(ContainSubstring("finished call"))
+			Expect(buf).To(ContainSubstring(`"source":"ApiRequestLog"`))
 			Expect(buf.String()).To(ContainSubstring(`"protocol":"HTTP"`))
 			Expect(buf.String()).To(ContainSubstring(`"method_type":"unary"`))
 			Expect(buf.String()).To(ContainSubstring(`"component":"server"`))
@@ -144,8 +136,10 @@ var _ = Describe("Httpmw", func() {
 			req.Header.Set(requestid.RequestAcsOperationIDHeader, "test-operation-id")
 			req.Header.Set(requestid.RequestCorrelationIDHeader, "test-correlation-id")
 
-			router.ServeHTTP(w, req)
+			routersMap["default"].ServeHTTP(w, req)
 
+			cfg := routerCfg["default"]
+			buf := cfg.buf
 			Expect(buf.String()).To(ContainSubstring(`"operationid":"test-operation-id"`))
 			Expect(buf.String()).To(ContainSubstring(`"correlationid":"test-correlation-id"`))
 			Expect(buf.String()).ToNot(ContainSubstring(`"armclientrequestid"`))
@@ -173,25 +167,19 @@ var _ = Describe("Httpmw", func() {
 
 			// Update the request with the prepared context.
 			updatedReq := req.WithContext(ctx)
-			routerWithExtraLogging.ServeHTTP(w, updatedReq)
-
+			routersMap["extra-logging"].ServeHTTP(w, updatedReq)
+			cfg := routerCfg["extra-logging"]
+			buf2 := cfg.buf
 			Expect(buf2.String()).To(ContainSubstring(`"operationid":"test-operation-id"`))
 			Expect(buf2.String()).To(ContainSubstring(`"correlationid":"test-correlation-id"`))
 			Expect(buf2.String()).ToNot(ContainSubstring(`"armclientrequestid"`))
 
-			Expect(buf2.String()).To(ContainSubstring("finished call"))
-			Expect(buf2.String()).To(ContainSubstring(`"source":"customSource"`)) // source should equal custom value
-			Expect(buf2.String()).To(ContainSubstring(`"protocol":"HTTP"`))
-			Expect(buf2.String()).To(ContainSubstring(`"method_type":"unary"`))
-			Expect(buf2.String()).To(ContainSubstring(`"component":"server"`))
-			Expect(buf2.String()).To(ContainSubstring(`"time_ms":`))
-			Expect(buf2.String()).To(ContainSubstring(`"service":"`))
-			Expect(buf2.String()).To(ContainSubstring(`"url":"`))
+			checkDefaultAttributes(*buf2, cfg.source, w)
 
 			// check extra attributes
 			Expect(buf2.String()).To(ContainSubstring(`"%s":"%s"`, rgnameKey, "test-rgname-value"))
 			Expect(buf2.String()).To(ContainSubstring(`"%s":"%s"`, subIdKey, "test-subid-value"))
-			Expect(buf2.String()).To(ContainSubstring(`"%s":"%s"`, errorDetailsKey, errorDetailsKey+"value"))
+			Expect(buf2.String()).To(ContainSubstring(`"%s":"%s"`, errorDetailsKey, "defaultErrorDetailsvalue"))
 			Expect(buf2.String()).To(ContainSubstring(`"%s":%d`, resultTypeKey, 2))
 			Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
 		})
@@ -200,34 +188,22 @@ var _ = Describe("Httpmw", func() {
 			w := httptest.NewRecorder()
 			req := httptest.NewRequest("GET", "/", nil)
 
+			routerWithoutInitializer := routersMap["without-initializer"]
 			routerWithoutInitializer.ServeHTTP(w, req)
+			cfg := routerCfg["without-initializer"]
+			buf3 := cfg.buf
 
-			Expect(buf3.String()).To(ContainSubstring("finished call"))
-			Expect(buf3.String()).To(ContainSubstring(`"source":"ApiRequestLog"`))
-			Expect(buf3.String()).To(ContainSubstring(`"protocol":"HTTP"`))
-			Expect(buf3.String()).To(ContainSubstring(`"method_type":"unary"`))
-			Expect(buf3.String()).To(ContainSubstring(`"component":"server"`))
-			Expect(buf3.String()).To(ContainSubstring(`"time_ms":`))
-			Expect(buf3.String()).To(ContainSubstring(`"service":"`))
-			Expect(buf3.String()).To(ContainSubstring(`"url":"`))
-			Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
+			checkDefaultAttributes(*buf3, cfg.source, w)
 			Expect(buf3.String()).To(ContainSubstring(`"hello":"world"`)) // assigner was set by user without initializer, but assigner should not be overwritten
-			routerWithoutAssigner.ServeHTTP(w, req)
 
 			w2 := httptest.NewRecorder()
 			req2 := httptest.NewRequest("GET", "/", nil)
-
+			routerWithoutAssigner := routersMap["without-assigner"]
 			routerWithoutAssigner.ServeHTTP(w2, req2)
+			cfg4 := routerCfg["without-assigner"]
+			buf4 := cfg4.buf
 
-			Expect(buf4.String()).To(ContainSubstring("finished call"))
-			Expect(buf4.String()).To(ContainSubstring(`"source":"ApiRequestLog"`))
-			Expect(buf4.String()).To(ContainSubstring(`"protocol":"HTTP"`))
-			Expect(buf4.String()).To(ContainSubstring(`"method_type":"unary"`))
-			Expect(buf4.String()).To(ContainSubstring(`"component":"server"`))
-			Expect(buf4.String()).To(ContainSubstring(`"time_ms":`))
-			Expect(buf4.String()).To(ContainSubstring(`"service":"`))
-			Expect(buf4.String()).To(ContainSubstring(`"url":"`))
-			Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
+			checkDefaultAttributes(*buf4, cfg.source, w)
 			Expect(buf4.String()).To(ContainSubstring(`"hello":"world"`)) // initializer was set by user without assigner, but initializer should not be overwritten
 
 			routerWithoutAssigner.ServeHTTP(w, req)
@@ -286,4 +262,16 @@ func operationRequestFromContext(ctx context.Context) *OperationRequest {
 func (op *OperationRequest) copy() *OperationRequest {
 	r := *op
 	return &r
+}
+
+func checkDefaultAttributes(buf bytes.Buffer, source string, w *httptest.ResponseRecorder) {
+	Expect(buf.String()).To(ContainSubstring("finished call"))
+	Expect(buf.String()).To(ContainSubstring(`"source":"%s"`, source))
+	Expect(buf.String()).To(ContainSubstring(`"protocol":"HTTP"`))
+	Expect(buf.String()).To(ContainSubstring(`"method_type":"unary"`))
+	Expect(buf.String()).To(ContainSubstring(`"component":"server"`))
+	Expect(buf.String()).To(ContainSubstring(`"time_ms":`))
+	Expect(buf.String()).To(ContainSubstring(`"service":"`))
+	Expect(buf.String()).To(ContainSubstring(`"url":"`))
+	Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
 }
