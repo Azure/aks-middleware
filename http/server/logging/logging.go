@@ -2,9 +2,9 @@ package logging
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
-	"reflect"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -13,6 +13,7 @@ import (
 
 type initFunc func(w http.ResponseWriter, r *http.Request) map[string]interface{}
 type loggingFunc func(w http.ResponseWriter, r *http.Request, attrs map[string]interface{}) map[string]interface{}
+
 type AttributeManager struct {
 	AttributeInitializer initFunc    // sets keys for custom attributes at the beginning of ServeHTTP()
 	AttributeAssigner    loggingFunc // assigns values for custom attributes after request has completed
@@ -65,7 +66,7 @@ func (w *responseWriter) Write(b []byte) (int, error) {
 }
 
 func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// If any fields in CustomAttributes are nil, do not call them to avoid errors
+	// If any fields in AttributeManager are nil, set defaults to avoid errors
 	setDefaults := attributeFunctionsNotSet(&l.customAttributeInfo)
 
 	if setDefaults {
@@ -85,16 +86,18 @@ func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	latency := endTime.Sub(startTime)
 	updatedAttrs := (l.customAttributeInfo.AttributeAssigner)(customWriter, r, extraAttributes)
 
-	l.LogRequestEnd(ctx, r, "RequestEnd", customWriter.statusCode, latency, updatedAttrs)
-	l.LogRequestEnd(ctx, r, "finished call", customWriter.statusCode, latency, updatedAttrs)
+	updatedAttrs["code"] = customWriter.statusCode
+	updatedAttrs["time_ms"] = latency.Milliseconds()
+	l.LogRequestEnd(ctx, r, "RequestEnd", updatedAttrs)
+	l.LogRequestEnd(ctx, r, "finished call", updatedAttrs)
 }
 
-func (l *loggingMiddleware) BuildLoggingAttributes(ctx context.Context, r *http.Request, extra ...interface{}) []interface{} {
+func (l *loggingMiddleware) BuildLoggingAttributes(ctx context.Context, r *http.Request, extra map[string]interface{}) []interface{} {
 	setSourceIfEmpty(&l.source)
-	return BuildAttributes(ctx, l.source, r, extra...)
+	return BuildAttributes(ctx, l.source, r, extra)
 }
 
-func BuildAttributes(ctx context.Context, source string, r *http.Request, extra ...interface{}) []interface{} {
+func BuildAttributes(ctx context.Context, source string, r *http.Request, extra map[string]interface{}) []interface{} {
 	md, ok := metadata.FromIncomingContext(ctx)
 
 	headers := make(map[string]string)
@@ -107,12 +110,11 @@ func BuildAttributes(ctx context.Context, source string, r *http.Request, extra 
 	}
 
 	attributes := flattenAttributes(defaultAttributes(source, r))
-	for _, e := range extra {
-		flattened := flattenAttributes(e)
-		attributes = append(attributes, flattened...)
-	}
+	flattened := flattenAttributes(extra)
+	attributes = append(attributes, flattened...)
 
 	attributes = append(attributes, "headers", headers)
+	fmt.Println("updated attrs: ", attributes)
 	return attributes
 }
 
@@ -121,8 +123,8 @@ func (l *loggingMiddleware) LogRequestStart(ctx context.Context, r *http.Request
 	l.logger.InfoContext(ctx, msg, attributes...)
 }
 
-func (l *loggingMiddleware) LogRequestEnd(ctx context.Context, r *http.Request, msg string, statusCode int, duration time.Duration, extraAttributes map[string]interface{}) {
-	attributes := l.BuildLoggingAttributes(ctx, r, "code", statusCode, "time_ms", duration.Milliseconds(), extraAttributes)
+func (l *loggingMiddleware) LogRequestEnd(ctx context.Context, r *http.Request, msg string, extraAttributes map[string]interface{}) {
+	attributes := l.BuildLoggingAttributes(ctx, r, extraAttributes)
 	l.logger.InfoContext(ctx, msg, attributes...)
 }
 
@@ -146,23 +148,12 @@ func setDefaultInitializerAndAssigner(attributeManager *AttributeManager, source
 	defaultAssigner := func(w http.ResponseWriter, r *http.Request, attrs map[string]interface{}) map[string]interface{} {
 		return make(map[string]interface{}) // returning empty map because BuildAttributes sets default attributes regardless of default or user-defined assigner
 	}
-	if attributeManager.AttributeAssigner == nil {
-		attributeManager.AttributeAssigner = defaultAssigner
-	}
+	attributeManager.AttributeAssigner = defaultAssigner
+
 }
 
 // Adds map k:v pairs as separate entires in []interface{} list for logging
-func flattenAttributes(v interface{}) []interface{} {
-	rv := reflect.ValueOf(v)
-	if rv.Kind() != reflect.Map {
-		return []interface{}{v}
-	}
-
-	m, ok := v.(map[string]interface{})
-	if !ok {
-		return []interface{}{v}
-	}
-
+func flattenAttributes(m map[string]interface{}) []interface{} {
 	attrList := make([]interface{}, 0, len(m)*2)
 	for key, value := range m {
 		attrList = append(attrList, key, value)
@@ -178,7 +169,7 @@ func setSourceIfEmpty(source *string) {
 	}
 }
 
-// default attributes that are set
+// default attributes set for any request
 func defaultAttributes(source string, r *http.Request) map[string]interface{} {
 	return map[string]interface{}{
 		"source":      &source,

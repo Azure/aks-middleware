@@ -16,15 +16,19 @@ import (
 
 var _ = Describe("Httpmw", func() {
 	var (
-		router                 *mux.Router
-		routerWithExtraLogging *mux.Router
-		buf                    *bytes.Buffer
-		buf2                   *bytes.Buffer
-		slogLogger             *slog.Logger
-		rgnameKey              string
-		subIdKey               string
-		resultTypeKey          string
-		errorDetailsKey        string
+		router                   *mux.Router
+		routerWithoutInitializer *mux.Router
+		routerWithExtraLogging   *mux.Router
+		routerWithoutAssigner    *mux.Router
+		buf                      *bytes.Buffer
+		buf3                     *bytes.Buffer
+		buf4                     *bytes.Buffer
+		buf2                     *bytes.Buffer
+		slogLogger               *slog.Logger
+		rgnameKey                string
+		subIdKey                 string
+		resultTypeKey            string
+		errorDetailsKey          string
 	)
 
 	BeforeEach(func() {
@@ -47,6 +51,33 @@ var _ = Describe("Httpmw", func() {
 			w.WriteHeader(http.StatusOK)
 		})
 
+		// Router without Initializer function
+		routerWithoutInitializer = mux.NewRouter()
+		routerWithoutInitializer.Use(requestid.NewRequestIDMiddlewareWithExtractor(customExtractor))
+		buf3 = new(bytes.Buffer)
+		slogLogger3 := slog.New(slog.NewJSONHandler(buf3, nil))
+		routerWithoutInitializer.Use(NewLogging(slogLogger3, "", AttributeManager{AttributeAssigner: func(w http.ResponseWriter, r *http.Request, attrs map[string]interface{}) map[string]interface{} {
+			return map[string]interface{}{"hello": "world"}
+		}}))
+		routerWithoutInitializer.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
+			time.Sleep(10 * time.Millisecond)
+			w.WriteHeader(http.StatusOK)
+		})
+
+		// Router without Assigner function
+		routerWithoutAssigner = mux.NewRouter()
+		routerWithoutAssigner.Use(requestid.NewRequestIDMiddlewareWithExtractor(customExtractor))
+		buf4 = new(bytes.Buffer)
+		slogLogger4 := slog.New(slog.NewJSONHandler(buf4, nil))
+		routerWithoutAssigner.Use(NewLogging(slogLogger4, "", AttributeManager{AttributeInitializer: func(w http.ResponseWriter, r *http.Request) map[string]interface{} {
+			return map[string]interface{}{"hello": "world"}
+		}}))
+		routerWithoutAssigner.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
+			time.Sleep(10 * time.Millisecond)
+			w.WriteHeader(http.StatusOK)
+		})
+
+		// Router with extra logging attributes defined
 		routerWithExtraLogging = mux.NewRouter()
 		routerWithExtraLogging.Use(requestid.NewRequestIDMiddlewareWithExtractor(customExtractor))
 		subIdKey = "subscriptionID"
@@ -162,6 +193,44 @@ var _ = Describe("Httpmw", func() {
 			Expect(buf2.String()).To(ContainSubstring(`"%s":"%s"`, errorDetailsKey, errorDetailsKey+"value"))
 			Expect(buf2.String()).To(ContainSubstring(`"%s":%d`, resultTypeKey, 2))
 			Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
+		})
+
+		It("If either AttributeManager initializer or assigner is nil, default attributes should be set", func() {
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest("GET", "/", nil)
+
+			routerWithoutInitializer.ServeHTTP(w, req)
+
+			Expect(buf3.String()).To(ContainSubstring("finished call"))
+			Expect(buf3.String()).To(ContainSubstring(`"source":"ApiRequestLog"`))
+			Expect(buf3.String()).To(ContainSubstring(`"protocol":"HTTP"`))
+			Expect(buf3.String()).To(ContainSubstring(`"method_type":"unary"`))
+			Expect(buf3.String()).To(ContainSubstring(`"component":"server"`))
+			Expect(buf3.String()).To(ContainSubstring(`"time_ms":`))
+			Expect(buf3.String()).To(ContainSubstring(`"service":"`))
+			Expect(buf3.String()).To(ContainSubstring(`"url":"`))
+			Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
+			Expect(buf3.String()).ToNot(ContainSubstring(`"hello":"world"`)) // assigner was set by user without initializer, so this should be overwritten by default function
+
+			routerWithoutAssigner.ServeHTTP(w, req)
+
+			w2 := httptest.NewRecorder()
+			req2 := httptest.NewRequest("GET", "/", nil)
+
+			routerWithoutAssigner.ServeHTTP(w2, req2)
+
+			Expect(buf4.String()).To(ContainSubstring("finished call"))
+			Expect(buf4.String()).To(ContainSubstring(`"source":"ApiRequestLog"`))
+			Expect(buf4.String()).To(ContainSubstring(`"protocol":"HTTP"`))
+			Expect(buf4.String()).To(ContainSubstring(`"method_type":"unary"`))
+			Expect(buf4.String()).To(ContainSubstring(`"component":"server"`))
+			Expect(buf4.String()).To(ContainSubstring(`"time_ms":`))
+			Expect(buf4.String()).To(ContainSubstring(`"service":"`))
+			Expect(buf4.String()).To(ContainSubstring(`"url":"`))
+			Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
+			Expect(buf4.String()).ToNot(ContainSubstring(`"hello":"world"`)) // assigner was set by user without initializer, so this should be overwritten by default function
+
+			routerWithoutAssigner.ServeHTTP(w, req)
 		})
 	})
 })
