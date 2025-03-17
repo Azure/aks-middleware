@@ -15,7 +15,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-// Holds the configuration for each test routers
+// Configuration for test routers
 type routerConfig struct {
 	buf     *bytes.Buffer
 	logger  *slog.Logger
@@ -102,7 +102,6 @@ var _ = Describe("Httpmw", func() {
 		return r
 	}
 
-	// For demonstration, create a map of routers by name.
 	routersMap := map[string]*mux.Router{}
 
 	BeforeEach(func() {
@@ -165,7 +164,6 @@ var _ = Describe("Httpmw", func() {
 			}
 			ctx = context.WithValue(ctx, operationRequestKey, opReq)
 
-			// Update the request with the prepared context.
 			updatedReq := req.WithContext(ctx)
 			routersMap["extra-logging"].ServeHTTP(w, updatedReq)
 			cfg := routerCfg["extra-logging"]
@@ -212,7 +210,6 @@ var _ = Describe("Httpmw", func() {
 
 	Describe("Test Helpers", func() {
 		It("test setDefaultInitializerAndAssigner()", func() {
-			// empty Attribute Manager, source not set
 			attrMgr := &AttributeManager{}
 			source := to.Ptr("")
 			setInitializerAndAssignerIfNil(attrMgr, source)
