@@ -207,34 +207,34 @@ var _ = Describe("Httpmw", func() {
 			routerWithoutAssigner.ServeHTTP(w, req)
 		})
 	})
+})
 
-	Describe("Test Helpers", func() {
-		It("test setDefaultInitializerAndAssigner()", func() {
-			attrMgr := &AttributeManager{}
-			source := to.Ptr("")
-			setInitializerAndAssignerIfNil(attrMgr, source)
-			Expect(attrMgr.AttributeAssigner).ToNot(BeNil())
-			Expect(attrMgr.AttributeInitializer).ToNot(BeNil())
-			w := httptest.NewRecorder()
-			req := httptest.NewRequest("GET", "/", nil)
-			initMap := attrMgr.AttributeInitializer(w, req)
-			Expect(initMap).To(BeEmpty())
-			finalMap := attrMgr.AttributeAssigner(w, req, initMap)
-			Expect(finalMap).To(BeEmpty())
-			Expect(*source).To(Equal("ApiRequestLog"))
-		})
+var _ = Describe("Test Helpers", func() {
+	It("test setDefaultInitializerAndAssigner()", func() {
+		attrMgr := &AttributeManager{}
+		source := to.Ptr("")
+		setInitializerAndAssignerIfNil(attrMgr, source)
+		Expect(attrMgr.AttributeAssigner).ToNot(BeNil())
+		Expect(attrMgr.AttributeInitializer).ToNot(BeNil())
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest("GET", "/", nil)
+		initMap := attrMgr.AttributeInitializer(w, req)
+		Expect(initMap).To(BeEmpty())
+		finalMap := attrMgr.AttributeAssigner(w, req, initMap)
+		Expect(finalMap).To(BeEmpty())
+		Expect(*source).To(Equal("ApiRequestLog"))
+	})
 
-		It("Test flattenAttributes()", func() {
-			attrMap := map[string]interface{}{
-				"hello":   "world",
-				"latency": 2,
-			}
-			attrList := flattenAttributes(attrMap)
-			Expect(attrList[0]).To(Equal("hello"))
-			Expect(attrList[1]).To(Equal("world"))
-			Expect(attrList[2]).To(Equal("latency"))
-			Expect(attrList[3]).To(Equal(2))
-		})
+	It("Test flattenAttributes()", func() {
+		attrMap := map[string]interface{}{
+			"hello":   "world",
+			"latency": 2,
+		}
+		attrList := flattenAttributes(attrMap)
+		Expect(attrList[0]).To(Equal("hello"))
+		Expect(attrList[1]).To(Equal("world"))
+		Expect(attrList[2]).To(Equal("latency"))
+		Expect(attrList[3]).To(Equal(2))
 	})
 })
 
