@@ -211,8 +211,7 @@ var _ = Describe("Httpmw", func() {
 			Expect(buf3.String()).To(ContainSubstring(`"service":"`))
 			Expect(buf3.String()).To(ContainSubstring(`"url":"`))
 			Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
-			Expect(buf3.String()).ToNot(ContainSubstring(`"hello":"world"`)) // assigner was set by user without initializer, so this should be overwritten by default function
-
+			Expect(buf3.String()).To(ContainSubstring(`"hello":"world"`)) // assigner was set by user without initializer, but assigner should not be overwritten
 			routerWithoutAssigner.ServeHTTP(w, req)
 
 			w2 := httptest.NewRecorder()
@@ -229,7 +228,7 @@ var _ = Describe("Httpmw", func() {
 			Expect(buf4.String()).To(ContainSubstring(`"service":"`))
 			Expect(buf4.String()).To(ContainSubstring(`"url":"`))
 			Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
-			Expect(buf4.String()).ToNot(ContainSubstring(`"hello":"world"`)) // assigner was set by user without initializer, so this should be overwritten by default function
+			Expect(buf4.String()).To(ContainSubstring(`"hello":"world"`)) // initializer was set by user without assigner, but initializer should not be overwritten
 
 			routerWithoutAssigner.ServeHTTP(w, req)
 		})
@@ -240,7 +239,7 @@ var _ = Describe("Httpmw", func() {
 			// empty Attribute Manager, source not set
 			attrMgr := &AttributeManager{}
 			source := to.Ptr("")
-			setDefaultInitializerAndAssigner(attrMgr, source)
+			setInitializerAndAssignerIfNil(attrMgr, source)
 			Expect(attrMgr.AttributeAssigner).ToNot(BeNil())
 			Expect(attrMgr.AttributeInitializer).ToNot(BeNil())
 			w := httptest.NewRecorder()
