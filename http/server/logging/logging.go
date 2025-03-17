@@ -67,12 +67,7 @@ func (w *responseWriter) Write(b []byte) (int, error) {
 
 func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// If any fields in AttributeManager are nil, set defaults to avoid errors
-	setDefaults := attributeFunctionsNotSet(&l.customAttributeInfo)
-
-	if setDefaults {
-		fmt.Println("Setting default initializer and assigner!!!")
-		setDefaultInitializerAndAssigner(&l.customAttributeInfo, &l.source)
-	}
+	setInitializerAndAssignerIfNil(&l.customAttributeInfo, &l.source)
 
 	extraAttributes := (l.customAttributeInfo.AttributeInitializer)(w, r)
 
@@ -129,31 +124,24 @@ func (l *loggingMiddleware) LogRequestEnd(ctx context.Context, r *http.Request, 
 	l.logger.InfoContext(ctx, msg, attributes...)
 }
 
-// Returns true if extra attributes should be logged, false otherwise
-func attributeFunctionsNotSet(attrStruct *AttributeManager) bool {
-	if attrStruct == nil || attrStruct.AttributeInitializer == nil || attrStruct.AttributeAssigner == nil {
-		return true
-	} else {
-		return false
-	}
-}
-
-// Sets a default Initializer and Assigner function for Attribute Manager. Default attributes will be set in BuildAttributes()
-func setDefaultInitializerAndAssigner(attributeManager *AttributeManager, source *string) {
-	if attributeManager == nil {
-		attributeManager = &AttributeManager{}
+// Sets the initializer and/or assigner to a default function if nil
+func setInitializerAndAssignerIfNil(attrManager *AttributeManager, source *string) {
+	if attrManager == nil {
+		attrManager = &AttributeManager{}
 	}
 
-	defaultInitializer := func(w http.ResponseWriter, r *http.Request) map[string]interface{} {
-		setSourceIfEmpty(source)
-		return make(map[string]interface{})
+	if attrManager.AttributeInitializer == nil {
+		attrManager.AttributeInitializer = func(w http.ResponseWriter, r *http.Request) map[string]interface{} {
+			setSourceIfEmpty(source)
+			return make(map[string]interface{})
+		}
 	}
-	attributeManager.AttributeInitializer = defaultInitializer
 
-	defaultAssigner := func(w http.ResponseWriter, r *http.Request, attrs map[string]interface{}) map[string]interface{} {
-		return make(map[string]interface{}) // returning empty map because BuildAttributes sets default attributes regardless of default or user-defined assigner
+	if attrManager.AttributeAssigner == nil {
+		attrManager.AttributeAssigner = func(w http.ResponseWriter, r *http.Request, attrs map[string]interface{}) map[string]interface{} {
+			return make(map[string]interface{}) // returning empty map because BuildAttributes sets default attributes regardless of default or user-defined assigner
+		}
 	}
-	attributeManager.AttributeAssigner = defaultAssigner
 }
 
 // Adds map k:v pairs as separate entires in []interface{} list for logging
