@@ -2,7 +2,6 @@ package logging
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -84,7 +83,7 @@ func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	updatedAttrs["code"] = customWriter.statusCode
 	updatedAttrs["time_ms"] = latency.Milliseconds()
-	fmt.Println("calling log request end")
+
 	l.LogRequestEnd(ctx, r, "RequestEnd", updatedAttrs)
 	l.LogRequestEnd(ctx, r, "finished call", updatedAttrs)
 }
