@@ -1,269 +1,220 @@
 package logging
 
 import (
-	"bytes"
-	"log/slog"
-	"net/http"
-	"net/http/httptest"
-	"time"
+    "bytes"
+    "log/slog"
+    "net/http"
+    "net/http/httptest"
+    "time"
 
-	"github.com/Azure/aks-middleware/http/server/requestid"
-	"github.com/gorilla/mux"
-	"github.com/microsoft/go-otel-audit/audit"
-	"github.com/microsoft/go-otel-audit/audit/conn"
-	"github.com/microsoft/go-otel-audit/audit/msgs"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+    "github.com/Azure/aks-middleware/http/server/requestid"
+    "github.com/gorilla/mux"
+    "github.com/microsoft/go-otel-audit/audit"
+    "github.com/microsoft/go-otel-audit/audit/conn"
+    "github.com/microsoft/go-otel-audit/audit/msgs"
+    . "github.com/onsi/ginkgo/v2"
+    . "github.com/onsi/gomega"
 )
 
 var _ = Describe("Httpmw Integration Test", func() {
-	var (
-		router     *mux.Router
-		otelConfig *OtelConfig
-		buf        *bytes.Buffer
-		slogLogger *slog.Logger
-	)
+    var (
+        router     *mux.Router
+        otelConfig *OtelConfig
+        buf        *bytes.Buffer
+        slogLogger *slog.Logger
+    )
 
-	// Helper function to create a real audit client
-	// https://github.com/microsoft/go-otel-audit/blob/baa5ee96eb7d46a8004b207d722d750dfa9d163b/audit/internal/scenarios/scenarios_test.go#L50
-	createAuditClient := func() *audit.Client {
-		// function creates a new connection to socket
-		clienConn := func() (conn.Audit, error) {
-			return conn.NewNoOP(), nil
-		}
-		// creates client that utilizes prev function to connect
-		client, err := audit.New(clienConn)
-		Expect(err).To(BeNil())
-		return client
-	}
+    // Helper function to create a real audit client
+    createAuditClient := func() *audit.Client {
+        clienConn := func() (conn.Audit, error) {
+            return conn.NewNoOP(), nil
+        }
+        client, err := audit.New(clienConn)
+        Expect(err).To(BeNil())
+        return client
+    }
 
-	BeforeEach(func() {
-		buf = new(bytes.Buffer)
-		slogLogger = slog.New(slog.NewJSONHandler(buf, nil))
-		router = mux.NewRouter()
+    BeforeEach(func() {
+        // Initialize common OtelConfig
+        otelConfig = &OtelConfig{
+            Client:                    createAuditClient(),
+            CustomOperationDescs:      make(map[string]string),
+            CustomOperationCategories: map[string]msgs.OperationCategory{},
+            OperationAccessLevel:      "Test Contributor Role",
+        }
+        // Initialize common logger and router
+        buf = new(bytes.Buffer)
+        slogLogger = slog.New(slog.NewJSONHandler(buf, nil))
+        router = mux.NewRouter()
 
-		customExtractor := func(r *http.Request) map[string]string {
-			return map[string]string{
-				string(requestid.CorrelationIDKey): r.Header.Get(requestid.RequestCorrelationIDHeader),
-				string(requestid.OperationIDKey):   r.Header.Get(requestid.RequestAcsOperationIDHeader),
-			}
-		}
+        customExtractor := func(r *http.Request) map[string]string {
+            return map[string]string{
+                string(requestid.CorrelationIDKey): r.Header.Get(requestid.RequestCorrelationIDHeader),
+                string(requestid.OperationIDKey):   r.Header.Get(requestid.RequestAcsOperationIDHeader),
+            }
+        }
 
-		// Initialize OtelConfig with default values
-		otelConfig = &OtelConfig{
-			Client:                    createAuditClient(),
-			CustomOperationDescs:      make(map[string]string),
-			CustomOperationCategories: map[string]msgs.OperationCategory{},
-			OperationAccessLevel:      "Test Contributor Role",
-		}
+        router.Use(requestid.NewRequestIDMiddlewareWithExtractor(customExtractor))
+        router.Use(NewLogging(slogLogger, otelConfig))
+        // Common simple endpoint
+        router.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
+            time.Sleep(10 * time.Millisecond)
+            w.WriteHeader(http.StatusOK)
+        })
+    })
 
-		router.Use(requestid.NewRequestIDMiddlewareWithExtractor(customExtractor))
-		router.Use(NewLogging(slogLogger, otelConfig))
+    Describe("LoggingMiddleware with Real Audit Client", func() {
+        It("should log and return OK status", func() {
+            // No need to reinitialize logger or middleware here.
+            w := httptest.NewRecorder()
+            req := httptest.NewRequest("GET", "/", nil)
 
-		router.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
-			time.Sleep(10 * time.Millisecond)
-			w.WriteHeader(http.StatusOK)
-		})
-	})
+            router.ServeHTTP(w, req)
 
-	Describe("LoggingMiddleware with Real Audit Client", func() {
-		It("should log and return OK status", func() {
-			buf := new(bytes.Buffer)
-			slogLogger := slog.New(slog.NewJSONHandler(buf, nil))
-			router.Use(NewLogging(slogLogger, otelConfig))
+            logOutput := buf.String()
+            Expect(logOutput).To(ContainSubstring("finished call"))
+            Expect(logOutput).To(ContainSubstring(`"source":"ApiRequestLog"`))
+            Expect(logOutput).To(ContainSubstring(`"protocol":"HTTP"`))
+            Expect(logOutput).To(ContainSubstring(`"method_type":"unary"`))
+            Expect(logOutput).To(ContainSubstring(`"component":"server"`))
+            Expect(logOutput).To(ContainSubstring(`"time_ms":`))
+            Expect(logOutput).To(ContainSubstring(`"service":"`))
+            Expect(logOutput).To(ContainSubstring(`"url":"`))
+            Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
+        })
 
-			router.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
-				time.Sleep(10 * time.Millisecond)
-				w.WriteHeader(http.StatusOK)
-			})
+        It("should log operationID and correlationID from headers", func() {
+            w := httptest.NewRecorder()
+            req := httptest.NewRequest("GET", "/", nil)
+            req.Header.Set(requestid.RequestAcsOperationIDHeader, "test-operation-id")
+            req.Header.Set(requestid.RequestCorrelationIDHeader, "test-correlation-id")
 
-			w := httptest.NewRecorder()
-			req := httptest.NewRequest("GET", "/", nil)
+            router.ServeHTTP(w, req)
 
-			router.ServeHTTP(w, req)
+            logOutput := buf.String()
+            Expect(logOutput).To(ContainSubstring(`"operationid":"test-operation-id"`))
+            Expect(logOutput).To(ContainSubstring(`"correlationid":"test-correlation-id"`))
+            Expect(logOutput).ToNot(ContainSubstring(`"armclientrequestid"`))
+            Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
+        })
 
-			Expect(buf.String()).To(ContainSubstring("finished call"))
-			Expect(buf.String()).To(ContainSubstring(`"source":"ApiRequestLog"`))
-			Expect(buf.String()).To(ContainSubstring(`"protocol":"HTTP"`))
-			Expect(buf.String()).To(ContainSubstring(`"method_type":"unary"`))
-			Expect(buf.String()).To(ContainSubstring(`"component":"server"`))
-			Expect(buf.String()).To(ContainSubstring(`"time_ms":`))
-			Expect(buf.String()).To(ContainSubstring(`"service":"`))
-			Expect(buf.String()).To(ContainSubstring(`"url":"`))
-			Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
-		})
+        It("should send audit event on request completion", func() {
+            // Reuse the existing router & logger
+            // Instead of reinitializing, simply set needed headers.
+            w := httptest.NewRecorder()
+            req := httptest.NewRequest("GET", "/", nil)
+            req.Header.Set("User-Agent", "TestAgent")
+            req.Header.Set("x-ms-client-app-id", "TestClientAppID")
+            req.Header.Set("Region", "us-west")
 
-		It("should log operationID and correlationID from headers", func() {
-			w := httptest.NewRecorder()
-			req := httptest.NewRequest("GET", "/", nil)
-			req.Header.Set(requestid.RequestAcsOperationIDHeader, "test-operation-id")
-			req.Header.Set(requestid.RequestCorrelationIDHeader, "test-correlation-id")
+            router.ServeHTTP(w, req)
 
-			router.ServeHTTP(w, req)
+            logOutput := buf.String()
+            Expect(logOutput).To(ContainSubstring("sending audit logs"))
+            Expect(logOutput).ToNot(ContainSubstring("failed to send audit event"))
+        })
 
-			Expect(buf.String()).To(ContainSubstring(`"operationid":"test-operation-id"`))
-			Expect(buf.String()).To(ContainSubstring(`"correlationid":"test-correlation-id"`))
-			Expect(buf.String()).ToNot(ContainSubstring(`"armclientrequestid"`))
-			Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
-		})
+        It("should log error if audit client is nil", func() {
+            nilConfig := &OtelConfig{
+                Client:               nil,
+                CustomOperationDescs: make(map[string]string),
+                OperationAccessLevel: "Azure Kubernetes Fleet Manager Contributor Role",
+            }
+            // Use a separate router for this test to avoid altering the global one.
+            localRouter := mux.NewRouter()
+            localRouter.Use(NewLogging(slogLogger, nilConfig))
+            localRouter.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
+                w.WriteHeader(http.StatusInternalServerError)
+            })
 
-		It("should send audit event on request completion", func() {
-			buf := new(bytes.Buffer)
-			slogLogger := slog.New(slog.NewJSONHandler(buf, nil))
-			router.Use(NewLogging(slogLogger, otelConfig))
+            w := httptest.NewRecorder()
+            req := httptest.NewRequest("GET", "/", nil)
 
-			router.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
-				w.WriteHeader(http.StatusOK)
-			})
+            localRouter.ServeHTTP(w, req)
 
-			w := httptest.NewRecorder()
-			req := httptest.NewRequest("GET", "/", nil)
-			req.Header.Set("User-Agent", "TestAgent")
-			req.Header.Set("x-ms-client-app-id", "TestClientAppID")
-			req.Header.Set("Region", "us-west")
+            Expect(buf.String()).To(ContainSubstring("otel configuration or client is nil"))
+        })
 
-			router.ServeHTTP(w, req)
+        It("should log an error when method mapped to OCOther and no description is provided", func() {
+            updatedOtelConfig := &OtelConfig{
+                Client:  createAuditClient(),
+                CustomOperationDescs: make(map[string]string),
+                CustomOperationCategories: map[string]msgs.OperationCategory{
+                    "GET": msgs.OCOther,
+                },
+                OperationAccessLevel: "Test Contributor Role",
+            }
+            // Use a separate router for this test.
+            localRouter := mux.NewRouter()
+            localRouter.Use(NewLogging(slogLogger, updatedOtelConfig))
+            localRouter.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
+                w.WriteHeader(http.StatusInternalServerError)
+            })
 
-			Expect(buf.String()).To(ContainSubstring("sending audit logs"))
-			Expect(buf.String()).ToNot(ContainSubstring("failed to send audit event"))
-		})
+            w := httptest.NewRecorder()
+            req := httptest.NewRequest("GET", "/", nil)
+            localRouter.ServeHTTP(w, req)
 
-		It("should log error if audit client is nil", func() {
-			nilConfig := &OtelConfig{
-				Client:               nil,
-				CustomOperationDescs: make(map[string]string),
-				OperationAccessLevel: "Azure Kubernetes Fleet Manager Contributor Role",
-			}
+            logOutput := buf.String()
+            Expect(logOutput).To(ContainSubstring("failed to send audit event"))
+            Expect(logOutput).To(ContainSubstring("operation category description is required for category OCOther"))
+        })
 
-			buf := new(bytes.Buffer)
-			slogLogger := slog.New(slog.NewJSONHandler(buf, nil))
-			router.Use(NewLogging(slogLogger, nilConfig))
+        It("should log an error when the record object is invalid", func() {
+            // Do not set any headers so that caller identities are missing.
+            w := httptest.NewRecorder()
+            req := httptest.NewRequest("GET", "/", nil)
 
-			router.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
-				w.WriteHeader(http.StatusInternalServerError)
-			})
+            router.ServeHTTP(w, req)
 
-			w := httptest.NewRecorder()
-			req := httptest.NewRequest("GET", "/", nil)
+            Expect(buf.String()).To(ContainSubstring("failed to send audit event"))
+        })
 
-			router.ServeHTTP(w, req)
+        It("should handle validation failure when caller identities are missing", func() {
+            w := httptest.NewRecorder()
+            req := httptest.NewRequest("GET", "/", nil)
+            req.Header.Set("Region", "us-west")
+            req.Header.Set("User-Agent", "TestAgent")
+            // Intentionally omit identity headers
 
-			Expect(buf.String()).To(ContainSubstring("otel configuration or client is nil"))
-		})
+            router.ServeHTTP(w, req)
 
-		It("should log an error when method mapped to OCOther and no description is provided", func() {
-			updatedOtelConfig := &OtelConfig{
-				Client:               createAuditClient(),
-				CustomOperationDescs: make(map[string]string),
-				// custom mapping method to operation category
-				CustomOperationCategories: map[string]msgs.OperationCategory{
-					"GET": msgs.OCOther,
-				},
-				OperationAccessLevel: "Test Contributor Role",
-			}
+            logOutput := buf.String()
+            Expect(logOutput).To(ContainSubstring("failed to send audit event"))
+            Expect(logOutput).To(ContainSubstring("at least one caller identity is required"))
+        })
 
-			buf := new(bytes.Buffer)
-			slogLogger := slog.New(slog.NewJSONHandler(buf, nil))
-			router.Use(NewLogging(slogLogger, updatedOtelConfig))
+        It("should handle invalid remote address format", func() {
+            w := httptest.NewRecorder()
+            req := httptest.NewRequest("GET", "/", nil)
+            req.RemoteAddr = "invalid:address:format"
+            req.Header.Set("Region", "us-west")
+            req.Header.Set("x-ms-client-app-id", "TestClientAppID")
 
-			router.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
-				w.WriteHeader(http.StatusInternalServerError)
-			})
+            router.ServeHTTP(w, req)
 
-			w := httptest.NewRecorder()
-			req := httptest.NewRequest("GET", "/", nil)
+            Expect(buf.String()).To(ContainSubstring("failed to split host and port"))
+        })
 
-			router.ServeHTTP(w, req)
+        It("should extract buffered response body as error message", func() {
+            localRouter := mux.NewRouter()
+            localRouter.Use(NewLogging(slogLogger, otelConfig))
+            // Setup an error endpoint.
+            localRouter.HandleFunc("/error", func(w http.ResponseWriter, r *http.Request) {
+                http.Error(w, "simulated error occurred", http.StatusBadRequest)
+            })
 
-			Expect(buf.String()).To(ContainSubstring("failed to send audit event"))
-			// This error means the custom operation category mapping has worked
-			// but the description is missing
-			Expect(buf.String()).To(ContainSubstring("operation category description is required for category OCOther"))
+            w := httptest.NewRecorder()
+            req := httptest.NewRequest("GET", "/error", nil)
+            req.Header.Set("User-Agent", "TestAgent")
+            req.Header.Set("x-ms-client-app-id", "TestClientAppID")
+            req.Header.Set("Region", "us-west")
 
-		})
+            localRouter.ServeHTTP(w, req)
 
-		It("should log an error when the record object is invalid", func() {
-			buf := new(bytes.Buffer)
-			slogLogger := slog.New(slog.NewJSONHandler(buf, nil))
-			router.Use(NewLogging(slogLogger, otelConfig))
-
-			router.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
-				w.WriteHeader(http.StatusOK)
-			})
-
-			w := httptest.NewRecorder()
-			// We don't set any headers here to simulate an invalid record object
-			req := httptest.NewRequest("GET", "/", nil)
-
-			router.ServeHTTP(w, req)
-
-			Expect(buf.String()).To(ContainSubstring("failed to send audit event"))
-		})
-
-		It("should handle validation failure when caller identities are missing", func() {
-			buf := new(bytes.Buffer)
-			slogLogger := slog.New(slog.NewJSONHandler(buf, nil))
-			router.Use(NewLogging(slogLogger, otelConfig))
-
-			router.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
-				w.WriteHeader(http.StatusOK)
-			})
-
-			w := httptest.NewRecorder()
-			req := httptest.NewRequest("GET", "/", nil)
-			req.Header.Set("Region", "us-west")
-			req.Header.Set("User-Agent", "TestAgent")
-			// Intentionally omit identity headers
-
-			router.ServeHTTP(w, req)
-
-			Expect(buf.String()).To(ContainSubstring("failed to send audit event"))
-			Expect(buf.String()).To(ContainSubstring("at least one caller identity is required"))
-		})
-
-		It("should handle invalid remote address format", func() {
-			buf := new(bytes.Buffer)
-			slogLogger := slog.New(slog.NewJSONHandler(buf, nil))
-			router.Use(NewLogging(slogLogger, otelConfig))
-
-			router.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
-				w.WriteHeader(http.StatusOK)
-			})
-
-			w := httptest.NewRecorder()
-			req := httptest.NewRequest("GET", "/", nil)
-			req.RemoteAddr = "invalid:address:format"
-			req.Header.Set("Region", "us-west")
-			req.Header.Set("x-ms-client-app-id", "TestClientAppID")
-
-			router.ServeHTTP(w, req)
-
-			Expect(buf.String()).To(ContainSubstring("failed to split host and port"))
-		})
-	})
-
-	Describe("ServeHTTP testing", func() {
-		It("should extract buffered response body as error message", func() {
-			localRouter := mux.NewRouter()
-			localRouter.Use(NewLogging(slogLogger, otelConfig))
-
-			// Setup an endpoint that always returns an error.
-			localRouter.HandleFunc("/error", func(w http.ResponseWriter, r *http.Request) {
-				http.Error(w, "simulated error occurred", http.StatusBadRequest)
-			})
-
-			// Simulate a client request to the error endpoint.
-			w := httptest.NewRecorder()
-			req := httptest.NewRequest("GET", "/error", nil)
-			req.Header.Set("User-Agent", "TestAgent")
-			req.Header.Set("x-ms-client-app-id", "TestClientAppID")
-			req.Header.Set("Region", "us-west")
-			localRouter.ServeHTTP(w, req)
-
-			// The middleware's ServeHTTP extracts the buffered error response.
-			loggedOutput := buf.String()
-			Expect(loggedOutput).To(ContainSubstring("simulated error occurred"))
-			Expect(loggedOutput).To(ContainSubstring("sending audit logs"))
-		})
-	})
+            logOutput := buf.String()
+            Expect(logOutput).To(ContainSubstring("simulated error occurred"))
+            Expect(logOutput).To(ContainSubstring("sending audit logs"))
+        })
+    })
 })
