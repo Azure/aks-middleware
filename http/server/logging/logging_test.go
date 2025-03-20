@@ -230,11 +230,18 @@ var _ = Describe("Test Helpers", func() {
 			"hello":   "world",
 			"latency": 2,
 		}
+
 		attrList := flattenAttributes(attrMap)
-		Expect(attrList[0]).To(Equal("hello"))
-		Expect(attrList[1]).To(Equal("world"))
-		Expect(attrList[2]).To(Equal("latency"))
-		Expect(attrList[3]).To(Equal(2))
+		Expect(len(attrList)).To(Equal(4))
+
+		for i, val := range attrList {
+			if val == "hello" {
+				Expect(attrList[i+1]).To(Equal("world"))
+			}
+			if val == "latency" {
+				Expect(attrList[i+1]).To(Equal(2))
+			}
+		}
 	})
 })
 
