@@ -2,7 +2,6 @@ package logging
 
 import (
 	"bytes"
-	"context"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -26,11 +25,14 @@ var _ = Describe("Httpmw Integration Test", func() {
 	)
 
 	// Helper function to create a real audit client
+	// https://github.com/microsoft/go-otel-audit/blob/baa5ee96eb7d46a8004b207d722d750dfa9d163b/audit/internal/scenarios/scenarios_test.go#L50
 	createAuditClient := func() *audit.Client {
-		cc := func() (conn.Audit, error) {
+		// function creates a new connection to socket
+		clienConn := func() (conn.Audit, error) {
 			return conn.NewNoOP(), nil
 		}
-		client, err := audit.New(cc)
+		// creates client that utilizes prev function to connect
+		client, err := audit.New(clienConn)
 		Expect(err).To(BeNil())
 		return client
 	}
@@ -49,10 +51,10 @@ var _ = Describe("Httpmw Integration Test", func() {
 
 		// Initialize OtelConfig with default values
 		otelConfig = &OtelConfig{
-			Client:               createAuditClient(),
-			CustomOperationDescs: make(map[string]string),
+			Client:                    createAuditClient(),
+			CustomOperationDescs:      make(map[string]string),
 			CustomOperationCategories: map[string]msgs.OperationCategory{},
-			OperationAccessLevel: "Test Contributor Role",
+			OperationAccessLevel:      "Test Contributor Role",
 		}
 
 		router.Use(requestid.NewRequestIDMiddlewareWithExtractor(customExtractor))
@@ -122,15 +124,6 @@ var _ = Describe("Httpmw Integration Test", func() {
 
 			router.ServeHTTP(w, req)
 
-			mw := &loggingMiddleware{
-				next:       router,
-				logger:     slogLogger,
-				otelConfig: otelConfig,
-			}
-
-			msgCtx := context.TODO()
-			mw.sendOtelAuditEvent(msgCtx, w.Result().StatusCode, req, "")
-
 			Expect(buf.String()).To(ContainSubstring("sending audit logs"))
 			Expect(buf.String()).ToNot(ContainSubstring("failed to send audit event"))
 		})
@@ -155,21 +148,12 @@ var _ = Describe("Httpmw Integration Test", func() {
 
 			router.ServeHTTP(w, req)
 
-			mw := &loggingMiddleware{
-				next:       router,
-				logger:     slogLogger,
-				otelConfig: nilConfig,
-			}
-
-			msgCtx := context.TODO()
-			mw.sendOtelAuditEvent(msgCtx, w.Result().StatusCode, req, "")
-
 			Expect(buf.String()).To(ContainSubstring("otel configuration or client is nil"))
 		})
 
 		It("should log an error when method mapped to OCOther and no description is provided", func() {
 			updatedOtelConfig := &OtelConfig{
-				Client: createAuditClient(),
+				Client:               createAuditClient(),
 				CustomOperationDescs: make(map[string]string),
 				// custom mapping method to operation category
 				CustomOperationCategories: map[string]msgs.OperationCategory{
@@ -191,20 +175,11 @@ var _ = Describe("Httpmw Integration Test", func() {
 
 			router.ServeHTTP(w, req)
 
-			mw := &loggingMiddleware{
-				next:       router,
-				logger:     slogLogger,
-				otelConfig: updatedOtelConfig,
-			}
-
-			msgCtx := context.TODO()
-			mw.sendOtelAuditEvent(msgCtx, w.Result().StatusCode, req, "")
-
 			Expect(buf.String()).To(ContainSubstring("failed to send audit event"))
-			// This error means the custom operation category mapping has worked 
+			// This error means the custom operation category mapping has worked
 			// but the description is missing
 			Expect(buf.String()).To(ContainSubstring("operation category description is required for category OCOther"))
-			
+
 		})
 
 		It("should log an error when the record object is invalid", func() {
@@ -217,18 +192,10 @@ var _ = Describe("Httpmw Integration Test", func() {
 			})
 
 			w := httptest.NewRecorder()
+			// We don't set any headers here to simulate an invalid record object
 			req := httptest.NewRequest("GET", "/", nil)
 
 			router.ServeHTTP(w, req)
-
-			mw := &loggingMiddleware{
-				next:       router,
-				logger:     slogLogger,
-				otelConfig: otelConfig,
-			}
-
-			msgCtx := context.TODO()
-			mw.sendOtelAuditEvent(msgCtx, w.Result().StatusCode, req, "")
 
 			Expect(buf.String()).To(ContainSubstring("failed to send audit event"))
 		})
@@ -249,15 +216,6 @@ var _ = Describe("Httpmw Integration Test", func() {
 			// Intentionally omit identity headers
 
 			router.ServeHTTP(w, req)
-
-			mw := &loggingMiddleware{
-				next:       router,
-				logger:     slogLogger,
-				otelConfig: otelConfig,
-			}
-
-			msgCtx := context.TODO()
-			mw.sendOtelAuditEvent(msgCtx, w.Result().StatusCode, req, "")
 
 			Expect(buf.String()).To(ContainSubstring("failed to send audit event"))
 			Expect(buf.String()).To(ContainSubstring("at least one caller identity is required"))
@@ -280,15 +238,6 @@ var _ = Describe("Httpmw Integration Test", func() {
 
 			router.ServeHTTP(w, req)
 
-			mw := &loggingMiddleware{
-				next:       router,
-				logger:     slogLogger,
-				otelConfig: otelConfig,
-			}
-
-			msgCtx := context.TODO()
-			mw.sendOtelAuditEvent(msgCtx, w.Result().StatusCode, req, "")
-
 			Expect(buf.String()).To(ContainSubstring("failed to split host and port"))
 		})
 	})
@@ -297,12 +246,12 @@ var _ = Describe("Httpmw Integration Test", func() {
 		It("should extract buffered response body as error message", func() {
 			localRouter := mux.NewRouter()
 			localRouter.Use(NewLogging(slogLogger, otelConfig))
-			
+
 			// Setup an endpoint that always returns an error.
 			localRouter.HandleFunc("/error", func(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "simulated error occurred", http.StatusBadRequest)
 			})
-			
+
 			// Simulate a client request to the error endpoint.
 			w := httptest.NewRecorder()
 			req := httptest.NewRequest("GET", "/error", nil)
@@ -310,7 +259,7 @@ var _ = Describe("Httpmw Integration Test", func() {
 			req.Header.Set("x-ms-client-app-id", "TestClientAppID")
 			req.Header.Set("Region", "us-west")
 			localRouter.ServeHTTP(w, req)
-			
+
 			// The middleware's ServeHTTP extracts the buffered error response.
 			loggedOutput := buf.String()
 			Expect(loggedOutput).To(ContainSubstring("simulated error occurred"))

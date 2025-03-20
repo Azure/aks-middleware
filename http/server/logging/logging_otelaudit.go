@@ -9,6 +9,7 @@ import (
 
 	"github.com/microsoft/go-otel-audit/audit"
 	"github.com/microsoft/go-otel-audit/audit/msgs"
+	"github.com/gorilla/mux"
 )
 
 type OtelConfig struct {
@@ -81,9 +82,16 @@ func createOtelAuditEvent(logger *slog.Logger, statusCode int, req *http.Request
 func getCallerIdentities(req *http.Request) map[msgs.CallerIdentityType][]msgs.CallerIdentityEntry {
 	caller := make(map[msgs.CallerIdentityType][]msgs.CallerIdentityEntry)
 
+	// Context:
+	// Callers will setup their frontend routes like so:
+	// r.HandleFunc("/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}", handler)...
+
+	vars := mux.Vars(req) // Extract variables from the URL
+	subscriptionID := vars["subscriptionId"] // Get subscription ID from the URL
+
+
 	clientAppID := req.Header.Get("x-ms-client-app-id")
 	clientPrincipalName := req.Header.Get("x-ms-client-principal-name")
-	subscriptionID := req.Header.Get("subscriptionID") // Assuming subscription ID is in the header
 	clientTenantID := req.Header.Get("x-ms-client-tenant-id")
 
 	if clientAppID != "" {
@@ -124,6 +132,7 @@ func getCallerIdentities(req *http.Request) map[msgs.CallerIdentityType][]msgs.C
 
 	return caller
 }
+
 
 func getOperationCategory(method string, opCategoryMapping map[string]msgs.OperationCategory) msgs.OperationCategory {
 	if opCategoryMapping != nil {
