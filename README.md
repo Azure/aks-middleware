@@ -284,9 +284,6 @@ Key Features:
 - Security and Compliance: Audit logs are essential for meeting security needs, customer expectations, and compliance requirements for standards such as FISMA/FedRAMP, EU Model Clauses, and ISO 270013.
 - Middleware Implementation: The middleware includes a function that takes care of sending the audit logs, and the mw gathers other information by inspecting request/response elements. It also allows consumers to pass their own operation category descriptions .
 
-The Fleet team has already implemented a [middleware](https://msazure.visualstudio.com/CloudNativeCompute/_git/aks-rp?path=%2Ffleet%2Fpkg%2Fapi%2Fmiddleware%2Flogging_mw_otelaudit.go&version=GBmaster&_a=contents) for this, and this implementation is based off that to provide a generic version that any Microsoft service can use. 
-
-
 ## 5. <a id='HTTPclientviaAzureSDK'></a>HTTP client via Azure SDK
 
 ### 5.1. <a id='mdforward-1'></a>mdforward

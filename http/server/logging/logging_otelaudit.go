@@ -12,18 +12,19 @@ import (
 )
 
 type OtelConfig struct {
-	Client               *audit.Client
-	CustomOperationDescs map[string]string
-	OperationAccessLevel string
+	Client                    *audit.Client
+	CustomOperationDescs      map[string]string
+	CustomOperationCategories map[string]msgs.OperationCategory // <-- new field
+	OperationAccessLevel      string
 }
 
-func (l *loggingMiddleware) sendOtelAuditEvent(ctx context.Context, statusCode int, req *http.Request) {
+func (l *loggingMiddleware) sendOtelAuditEvent(ctx context.Context, statusCode int, req *http.Request, errorMsg string) {
     if l.otelConfig == nil || l.otelConfig.Client == nil {
         l.logger.Error("otel configuration or client is nil")
         return
     }
 
-    msg, err := createOtelAuditEvent(l.logger, statusCode, req, l.otelConfig)
+    msg, err := createOtelAuditEvent(l.logger, statusCode, req, l.otelConfig, errorMsg)
     if err != nil {
         l.logger.Error("failed to create audit event", "error", err)
         return
@@ -32,12 +33,10 @@ func (l *loggingMiddleware) sendOtelAuditEvent(ctx context.Context, statusCode i
     l.logger.Info("sending audit logs")
     if err := l.otelConfig.Client.Send(ctx, msg); err != nil {
         l.logger.Error("failed to send audit event", "error", err)
-    } else {
-        l.logger.Info("audit event sent successfully")
     }
 }
 
-func createOtelAuditEvent(logger *slog.Logger, statusCode int, req *http.Request, otelConfig *OtelConfig) (msgs.Msg, error) {
+func createOtelAuditEvent(logger *slog.Logger, statusCode int, req *http.Request, otelConfig *OtelConfig, errorMsg string) (msgs.Msg, error) {
     host, _, err := net.SplitHostPort(req.RemoteAddr)
     if err != nil {
         logger.Error("failed to split host and port", "error", err)
@@ -61,7 +60,7 @@ func createOtelAuditEvent(logger *slog.Logger, statusCode int, req *http.Request
     record := msgs.Record{
         CallerIpAddress:              addr,
         CallerIdentities:             getCallerIdentities(req),
-        OperationCategories:          []msgs.OperationCategory{getOperationCategory(req.Method, otelConfig.CustomOperationDescs)},
+        OperationCategories:          []msgs.OperationCategory{getOperationCategory(req.Method, otelConfig.CustomOperationCategories)},
         OperationCategoryDescription: getOperationCategoryDescription(req.Method, otelConfig.CustomOperationDescs),
         TargetResources:              tr,
         CallerAccessLevels:           []string{"NA"},
@@ -70,7 +69,7 @@ func createOtelAuditEvent(logger *slog.Logger, statusCode int, req *http.Request
         CallerAgent:                  req.UserAgent(),
         OperationType:                getOperationType(req.Method),
         OperationResult:              getOperationResult(statusCode),
-        OperationResultDescription:   getOperationResultDescription(statusCode),
+        OperationResultDescription:   getOperationResultDescription(statusCode, errorMsg),
     }
 
     return msgs.Msg{
@@ -126,9 +125,11 @@ func getCallerIdentities(req *http.Request) map[msgs.CallerIdentityType][]msgs.C
 	return caller
 }
 
-func getOperationCategory(method string, opCategoryDesc map[string]string) msgs.OperationCategory {
-	if _, ok := opCategoryDesc[method]; ok {
-		return msgs.OCOther
+func getOperationCategory(method string, opCategoryMapping map[string]msgs.OperationCategory) msgs.OperationCategory {
+	if opCategoryMapping != nil {
+		if cat, ok := opCategoryMapping[method]; ok {
+			return cat
+		}
 	}
 	return msgs.ResourceManagement
 }
@@ -141,14 +142,14 @@ func getOperationCategoryDescription(method string, opCategoryDesc map[string]st
 }
 
 func getOperationType(method string) msgs.OperationType {
-    switch method {
-        case http.MethodPatch, http.MethodPost, http.MethodPut:
-            return msgs.Update
-        case http.MethodDelete:
-            return msgs.Delete
-        default:
-            return msgs.Read
-    }
+	switch method {
+	case http.MethodPatch, http.MethodPost, http.MethodPut:
+		return msgs.Update
+	case http.MethodDelete:
+		return msgs.Delete
+	default:
+		return msgs.Read
+	}
 }
 
 func getOperationResult(statusCode int) msgs.OperationResult {
@@ -158,9 +159,12 @@ func getOperationResult(statusCode int) msgs.OperationResult {
 	return msgs.Success
 }
 
-func getOperationResultDescription(statusCode int) string {
-	if statusCode >= 400 {
-		return fmt.Sprintf("operation failed with status code: %d", statusCode)
-	}
-	return "succeeded to run the operation"
+func getOperationResultDescription(statusCode int, errorMsg string) string {
+    if statusCode >= 400 {
+        if errorMsg != "" {
+            return fmt.Sprintf("operation failed with status code: %d, error: %s", statusCode, errorMsg)
+        }
+        return fmt.Sprintf("operation failed with status code: %d", statusCode)
+    }
+    return "succeeded to run the operation"
 }
