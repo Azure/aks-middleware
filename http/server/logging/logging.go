@@ -10,12 +10,12 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-type initFunc func(w http.ResponseWriter, r *http.Request) map[string]interface{}
-type loggingFunc func(w http.ResponseWriter, r *http.Request, attrs map[string]interface{}) map[string]interface{}
+type attributeInitializerFunc func(w http.ResponseWriter, r *http.Request) map[string]interface{}
+type attributeAssignerFunc func(w http.ResponseWriter, r *http.Request, attrs map[string]interface{}) map[string]interface{}
 
 type AttributeManager struct {
-	AttributeInitializer initFunc    // sets keys for custom attributes at the beginning of ServeHTTP()
-	AttributeAssigner    loggingFunc // assigns values for custom attributes after request has completed
+	AttributeInitializer attributeInitializerFunc // sets keys for custom attributes at the beginning of ServeHTTP()
+	AttributeAssigner    attributeAssignerFunc    // assigns values for custom attributes after request has completed
 }
 
 // TODO (Tom): Add a logger wrapper in its own package
@@ -23,15 +23,15 @@ type AttributeManager struct {
 // more info about http handler here: https://pkg.go.dev/net/http#Handler
 
 // If source is empty, it will be set to "ApiRequestLog"
-// If ANY fields in customAttributeAssigner are empty, or the struct itself is empty, default initializer and assigner will be set
-func NewLogging(logger *slog.Logger, source string, customAttributeAssigner AttributeManager) mux.MiddlewareFunc {
+// If a field in the attributeAssigner are empty, or the struct itself is empty, default functions will be set
+func NewLogging(logger *slog.Logger, source string, attributeManager AttributeManager) mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return &loggingMiddleware{
-			next:                next,
-			now:                 time.Now,
-			logger:              *logger,
-			source:              source,
-			customAttributeInfo: customAttributeAssigner,
+			next:              next,
+			now:               time.Now,
+			logger:            *logger,
+			source:            source,
+			attributemManager: attributeManager,
 		}
 	}
 }
@@ -40,11 +40,11 @@ func NewLogging(logger *slog.Logger, source string, customAttributeAssigner Attr
 var _ http.Handler = &loggingMiddleware{}
 
 type loggingMiddleware struct {
-	next                http.Handler
-	now                 func() time.Time
-	logger              slog.Logger
-	source              string
-	customAttributeInfo AttributeManager
+	next              http.Handler
+	now               func() time.Time
+	logger            slog.Logger
+	source            string
+	attributemManager AttributeManager
 }
 
 type responseWriter struct {
@@ -66,9 +66,9 @@ func (w *responseWriter) Write(b []byte) (int, error) {
 
 func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// If any fields in AttributeManager are nil, set defaults to avoid errors
-	setInitializerAndAssignerIfNil(&l.customAttributeInfo, &l.source)
+	setInitializerAndAssignerIfNil(&l.attributemManager, &l.source)
 
-	extraAttributes := (l.customAttributeInfo.AttributeInitializer)(w, r)
+	extraAttributes := (l.attributemManager.AttributeInitializer)(w, r)
 
 	customWriter := &responseWriter{ResponseWriter: w}
 	startTime := l.now()
@@ -79,7 +79,7 @@ func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	endTime := l.now()
 
 	latency := endTime.Sub(startTime)
-	updatedAttrs := (l.customAttributeInfo.AttributeAssigner)(customWriter, r, extraAttributes)
+	updatedAttrs := (l.attributemManager.AttributeAssigner)(customWriter, r, extraAttributes)
 
 	updatedAttrs["code"] = customWriter.statusCode
 	updatedAttrs["time_ms"] = latency.Milliseconds()
