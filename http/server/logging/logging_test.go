@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/Azure/aks-middleware/http/server/requestid"
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/gorilla/mux"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -212,8 +211,7 @@ var _ = Describe("Httpmw", func() {
 var _ = Describe("Test Helpers", func() {
 	It("test setDefaultInitializerAndAssigner()", func() {
 		attrMgr := &AttributeManager{}
-		source := to.Ptr("")
-		setInitializerAndAssignerIfNil(attrMgr, source)
+		setInitializerAndAssignerIfNil(attrMgr)
 		Expect(attrMgr.AttributeAssigner).ToNot(BeNil())
 		Expect(attrMgr.AttributeInitializer).ToNot(BeNil())
 		w := httptest.NewRecorder()

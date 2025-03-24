@@ -70,13 +70,12 @@ func (w *responseWriter) Write(b []byte) (int, error) {
 
 func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	setSourceIfEmpty(&l.source)
-	// If any fields in AttributeManager are nil, set defaults to avoid errors
 	addextraattributes := false
 	extraAttributes := make(map[string]interface{})
 
 	if l.attributemManager != nil || l.source == apiRequestLogSource {
 		addextraattributes = true
-		setInitializerAndAssignerIfNil(l.attributemManager, &l.source)
+		setInitializerAndAssignerIfNil(l.attributemManager)
 		extraAttributes = (l.attributemManager.AttributeInitializer)(w, r)
 	}
 
@@ -139,7 +138,7 @@ func (l *loggingMiddleware) LogRequestEnd(ctx context.Context, r *http.Request, 
 }
 
 // Sets the initializer and/or assigner to a default function if nil
-func setInitializerAndAssignerIfNil(attrManager *AttributeManager, source *string) {
+func setInitializerAndAssignerIfNil(attrManager *AttributeManager) {
 	if attrManager.AttributeInitializer == nil {
 		attrManager.AttributeInitializer = func(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 			return make(map[string]interface{})
