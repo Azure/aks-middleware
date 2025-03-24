@@ -222,7 +222,6 @@ var _ = Describe("Test Helpers", func() {
 		Expect(initMap).To(BeEmpty())
 		finalMap := attrMgr.AttributeAssigner(w, req, initMap)
 		Expect(finalMap).To(BeEmpty())
-		Expect(*source).To(Equal("ApiRequestLog"))
 	})
 
 	It("Test flattenAttributes()", func() {

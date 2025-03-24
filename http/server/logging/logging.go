@@ -18,6 +18,10 @@ type AttributeManager struct {
 	AttributeAssigner    attributeAssignerFunc    // assigns values for custom attributes after request has completed
 }
 
+const (
+	apiRequestLogSource = "ApiRequestLog"
+)
+
 // TODO (Tom): Add a logger wrapper in its own package
 // https://medium.com/@ansujain/building-a-logger-wrapper-in-go-with-support-for-multiple-logging-libraries-48092b826bee
 // more info about http handler here: https://pkg.go.dev/net/http#Handler
@@ -31,7 +35,7 @@ func NewLogging(logger *slog.Logger, source string, attributeManager AttributeMa
 			now:               time.Now,
 			logger:            *logger,
 			source:            source,
-			attributemManager: attributeManager,
+			attributemManager: &attributeManager,
 		}
 	}
 }
@@ -44,7 +48,7 @@ type loggingMiddleware struct {
 	now               func() time.Time
 	logger            slog.Logger
 	source            string
-	attributemManager AttributeManager
+	attributemManager *AttributeManager
 }
 
 type responseWriter struct {
@@ -65,10 +69,16 @@ func (w *responseWriter) Write(b []byte) (int, error) {
 }
 
 func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	setSourceIfEmpty(&l.source)
 	// If any fields in AttributeManager are nil, set defaults to avoid errors
-	setInitializerAndAssignerIfNil(&l.attributemManager, &l.source)
+	addextraattributes := false
+	extraAttributes := make(map[string]interface{})
 
-	extraAttributes := (l.attributemManager.AttributeInitializer)(w, r)
+	if l.attributemManager != nil || l.source == apiRequestLogSource {
+		addextraattributes = true
+		setInitializerAndAssignerIfNil(l.attributemManager, &l.source)
+		extraAttributes = (l.attributemManager.AttributeInitializer)(w, r)
+	}
 
 	customWriter := &responseWriter{ResponseWriter: w}
 	startTime := l.now()
@@ -79,7 +89,13 @@ func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	endTime := l.now()
 
 	latency := endTime.Sub(startTime)
-	updatedAttrs := (l.attributemManager.AttributeAssigner)(customWriter, r, extraAttributes)
+
+	var updatedAttrs map[string]interface{}
+	if addextraattributes {
+		updatedAttrs = (l.attributemManager.AttributeAssigner)(customWriter, r, extraAttributes)
+	} else {
+		updatedAttrs = extraAttributes
+	}
 
 	updatedAttrs["code"] = customWriter.statusCode
 	updatedAttrs["time_ms"] = latency.Milliseconds()
@@ -89,7 +105,6 @@ func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (l *loggingMiddleware) BuildLoggingAttributes(ctx context.Context, r *http.Request, extra map[string]interface{}) []interface{} {
-	setSourceIfEmpty(&l.source)
 	return BuildAttributes(ctx, l.source, r, extra)
 }
 
@@ -125,13 +140,8 @@ func (l *loggingMiddleware) LogRequestEnd(ctx context.Context, r *http.Request, 
 
 // Sets the initializer and/or assigner to a default function if nil
 func setInitializerAndAssignerIfNil(attrManager *AttributeManager, source *string) {
-	if attrManager == nil {
-		attrManager = &AttributeManager{}
-	}
-
 	if attrManager.AttributeInitializer == nil {
 		attrManager.AttributeInitializer = func(w http.ResponseWriter, r *http.Request) map[string]interface{} {
-			setSourceIfEmpty(source)
 			return make(map[string]interface{})
 		}
 	}
@@ -156,7 +166,7 @@ func flattenAttributes(m map[string]interface{}) []interface{} {
 // sets default source "ApiRequestLog"
 func setSourceIfEmpty(source *string) {
 	if len(*source) == 0 {
-		*source = "ApiRequestLog"
+		*source = apiRequestLogSource
 	}
 }
 
