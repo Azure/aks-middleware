@@ -10,8 +10,8 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-type AttributeInitializerFunc func(w http.ResponseWriter, r *http.Request) map[string]interface{}
-type AttributeAssignerFunc func(w http.ResponseWriter, r *http.Request, attrs map[string]interface{}) map[string]interface{}
+type AttributeInitializerFunc func(w *ResponseRecord, r *http.Request) map[string]interface{}
+type AttributeAssignerFunc func(w *ResponseRecord, r *http.Request, attrs map[string]interface{}) map[string]interface{}
 
 type AttributeManager struct {
 	AttributeInitializer AttributeInitializerFunc // sets keys for custom attributes at the beginning of ServeHTTP()
@@ -47,21 +47,25 @@ type customAttributeLoggingMiddleware struct {
 	attributemManager *AttributeManager
 }
 
-type responseWriter struct {
+type ResponseRecord struct {
 	http.ResponseWriter
 	statusCode int
 }
 
-func (w *responseWriter) WriteHeader(code int) {
-	w.statusCode = code
-	w.ResponseWriter.WriteHeader(code)
+func (r *ResponseRecord) WriteHeader(code int) {
+	r.statusCode = code
+	r.ResponseWriter.WriteHeader(code)
 }
 
-func (w *responseWriter) Write(b []byte) (int, error) {
-	if w.statusCode == 0 {
-		w.statusCode = http.StatusOK
+func (r *ResponseRecord) Write(b []byte) (int, error) {
+	if r.statusCode == 0 {
+		r.statusCode = http.StatusOK
 	}
-	return w.ResponseWriter.Write(b)
+	return r.ResponseWriter.Write(b)
+}
+
+func (r *ResponseRecord) StatusCode() int {
+	return r.statusCode
 }
 
 func (l *customAttributeLoggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -69,13 +73,14 @@ func (l *customAttributeLoggingMiddleware) ServeHTTP(w http.ResponseWriter, r *h
 	addextraattributes := false
 	extraAttributes := make(map[string]interface{})
 
+	customWriter := &ResponseRecord{ResponseWriter: w}
+
 	if l.attributemManager != nil || l.source == apiRequestLogSource {
 		addextraattributes = true
 		setInitializerAndAssignerIfNil(l.attributemManager)
-		extraAttributes = (l.attributemManager.AttributeInitializer)(w, r)
+		extraAttributes = (l.attributemManager.AttributeInitializer)(customWriter, r)
 	}
 
-	customWriter := &responseWriter{ResponseWriter: w}
 	startTime := l.now()
 	ctx := r.Context()
 
@@ -146,14 +151,14 @@ func setInitializerAndAssignerIfNil(attrManager *AttributeManager) {
 
 // Returns default attribute initializer
 func NewAttributeInitializer() AttributeInitializerFunc {
-	return func(w http.ResponseWriter, r *http.Request) map[string]interface{} {
+	return func(w *ResponseRecord, r *http.Request) map[string]interface{} {
 		return make(map[string]interface{})
 	}
 }
 
 // Returns default attribute assigner
 func NewAttributeAssigner() AttributeAssignerFunc {
-	return func(w http.ResponseWriter, r *http.Request, attrs map[string]interface{}) map[string]interface{} {
+	return func(w *ResponseRecord, r *http.Request, attrs map[string]interface{}) map[string]interface{} {
 		return make(map[string]interface{}) // returning empty map because BuildAttributes sets default attributes regardless of default or user-defined assigner
 	}
 }

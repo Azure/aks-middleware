@@ -56,7 +56,7 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 			source: apiRequestLogSource,
 			// only assigner provided
 			attrMgr: AttributeManager{
-				AttributeAssigner: func(w http.ResponseWriter, r *http.Request, attrs map[string]interface{}) map[string]interface{} {
+				AttributeAssigner: func(w *ResponseRecord, r *http.Request, attrs map[string]interface{}) map[string]interface{} {
 					return map[string]interface{}{customTestKey: customTestValue}
 				},
 			},
@@ -65,7 +65,7 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 			source: apiRequestLogSource,
 			// only initializer provided
 			attrMgr: AttributeManager{
-				AttributeInitializer: func(w http.ResponseWriter, r *http.Request) map[string]interface{} {
+				AttributeInitializer: func(w *ResponseRecord, r *http.Request) map[string]interface{} {
 					return map[string]interface{}{customTestKey: customTestValue}
 				},
 			},
@@ -73,7 +73,7 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 		extraLoggingVariablesRouterName: {
 			source: "customSource",
 			attrMgr: AttributeManager{
-				AttributeInitializer: func(w http.ResponseWriter, r *http.Request) map[string]interface{} {
+				AttributeInitializer: func(w *ResponseRecord, r *http.Request) map[string]interface{} {
 					return map[string]interface{}{
 						"subscriptionID":    "defaultSubIDvalue",
 						"resourceGroupName": "defaultRGnamevalue",
@@ -81,7 +81,7 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 						"errorDetails":      "defaultErrorDetailsvalue",
 					}
 				},
-				AttributeAssigner: func(w http.ResponseWriter, r *http.Request, attrMap map[string]interface{}) map[string]interface{} {
+				AttributeAssigner: func(w *ResponseRecord, r *http.Request, attrMap map[string]interface{}) map[string]interface{} {
 					opReq := operationRequestFromContext(r.Context())
 					if opReq != nil {
 						attrMap["resourceGroupName"] = opReq.ResourceGroupName
@@ -218,7 +218,7 @@ var _ = Describe("Test Helpers", func() {
 		setInitializerAndAssignerIfNil(attrMgr)
 		Expect(attrMgr.AttributeAssigner).ToNot(BeNil())
 		Expect(attrMgr.AttributeInitializer).ToNot(BeNil())
-		w := httptest.NewRecorder()
+		w := &ResponseRecord{}
 		req := httptest.NewRequest("GET", "/", nil)
 		initMap := attrMgr.AttributeInitializer(w, req)
 		Expect(initMap).To(BeEmpty())
