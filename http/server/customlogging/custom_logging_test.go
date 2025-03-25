@@ -179,6 +179,7 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 		subkey := ctxkey(subscriptionIDKey)
 
 		ctx := context.Background()
+		// extra logging attributes, the differentiator between customAttributeLoggingMiddleware and loggingMiddleware. Resource group name, subscription id, error details, and result type should be set in addition to default attributes
 		ctx = context.WithValue(ctx, rgkey, "test-rgname-value")
 		ctx = context.WithValue(ctx, subkey, "test-subid-value")
 		opReq := &OperationRequest{
