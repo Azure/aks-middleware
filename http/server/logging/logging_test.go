@@ -23,10 +23,10 @@ type routerConfig struct {
 }
 
 const (
-	subIdKey        = "subscriptionID"
-	rgnameKey       = "resourceGroupName"
-	resultTypeKey   = "resultType"
-	errorDetailsKey = "errorDetails"
+	subscriptionIDKey    = "subscriptionID"
+	resourceGroupNameKey = "resourceGroupName"
+	resultTypeKey        = "resultType"
+	errorDetailsKey      = "errorDetails"
 )
 
 var _ = Describe("Httpmw", func() {
@@ -151,8 +151,8 @@ var _ = Describe("Httpmw", func() {
 			req.Header.Set(requestid.RequestCorrelationIDHeader, "test-correlation-id")
 
 			type ctxkey string
-			rgkey := ctxkey(rgnameKey)
-			subkey := ctxkey(subIdKey)
+			rgkey := ctxkey(resourceGroupNameKey)
+			subkey := ctxkey(subscriptionIDKey)
 
 			ctx := context.Background()
 			ctx = context.WithValue(ctx, rgkey, "test-rgname-value")
@@ -174,8 +174,8 @@ var _ = Describe("Httpmw", func() {
 			checkDefaultAttributes(*buf2, cfg.source, w)
 
 			// check extra attributes
-			Expect(buf2.String()).To(ContainSubstring(`"%s":"%s"`, rgnameKey, "test-rgname-value"))
-			Expect(buf2.String()).To(ContainSubstring(`"%s":"%s"`, subIdKey, "test-subid-value"))
+			Expect(buf2.String()).To(ContainSubstring(`"%s":"%s"`, resourceGroupNameKey, "test-rgname-value"))
+			Expect(buf2.String()).To(ContainSubstring(`"%s":"%s"`, subscriptionIDKey, "test-subid-value"))
 			Expect(buf2.String()).To(ContainSubstring(`"%s":"%s"`, errorDetailsKey, "defaultErrorDetailsvalue"))
 			Expect(buf2.String()).To(ContainSubstring(`"%s":%d`, resultTypeKey, 2))
 			Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
