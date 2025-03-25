@@ -39,7 +39,7 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 		}
 	)
 
-	routerCfg := map[string]*routerConfig{
+	testRoutersConfiguationMap := map[string]*routerConfig{
 		"default": {
 			source:  apiRequestLogSource,
 			attrMgr: AttributeManager{},
@@ -104,7 +104,7 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 	routersMap := map[string]*mux.Router{}
 
 	BeforeAll(func() {
-		for name, cfg := range routerCfg {
+		for name, cfg := range testRoutersConfiguationMap {
 			routersMap[name] = buildRouter(cfg)
 		}
 	})
@@ -114,7 +114,7 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 		req := httptest.NewRequest("GET", "/", nil)
 		routersMap["default"].ServeHTTP(w, req)
 
-		cfg := routerCfg["default"]
+		cfg := testRoutersConfiguationMap["default"]
 		buf := cfg.buf
 		Expect(cfg.buf).To(ContainSubstring("finished call"))
 		Expect(buf).To(ContainSubstring(`"source":"ApiRequestLog"`))
@@ -135,12 +135,37 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 
 		routersMap["default"].ServeHTTP(w, req)
 
-		cfg := routerCfg["default"]
+		cfg := testRoutersConfiguationMap["default"]
 		buf := cfg.buf
 		Expect(buf.String()).To(ContainSubstring(`"operationid":"test-operation-id"`))
 		Expect(buf.String()).To(ContainSubstring(`"correlationid":"test-correlation-id"`))
 		Expect(buf.String()).ToNot(ContainSubstring(`"armclientrequestid"`))
 		Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
+	})
+
+	It("If either AttributeManager initializer or assigner is nil, default attributes should be set", func() {
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest("GET", "/", nil)
+
+		routerWithoutInitializer := routersMap["without-initializer"]
+		routerWithoutInitializer.ServeHTTP(w, req)
+		cfg := testRoutersConfiguationMap["without-initializer"]
+		buf3 := cfg.buf
+
+		checkDefaultAttributes(*buf3, cfg.source, w)
+		Expect(buf3.String()).To(ContainSubstring(`"hello":"world"`)) // assigner was set by user without initializer, but assigner should not be overwritten
+
+		w2 := httptest.NewRecorder()
+		req2 := httptest.NewRequest("GET", "/", nil)
+		routerWithoutAssigner := routersMap["without-assigner"]
+		routerWithoutAssigner.ServeHTTP(w2, req2)
+		cfg4 := testRoutersConfiguationMap["without-assigner"]
+		buf4 := cfg4.buf
+
+		checkDefaultAttributes(*buf4, cfg.source, w)
+		Expect(buf4.String()).To(ContainSubstring(`"hello":"world"`)) // initializer was set by user without assigner, but initializer should not be overwritten
+
+		routerWithoutAssigner.ServeHTTP(w, req)
 	})
 
 	It("should set values for extra attributes included for logging", func() {
@@ -164,7 +189,7 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 
 		req = req.WithContext(ctx)
 		routersMap["extra-logging"].ServeHTTP(w, req)
-		cfg := routerCfg["extra-logging"]
+		cfg := testRoutersConfiguationMap["extra-logging"]
 		buf2 := cfg.buf
 		Expect(buf2.String()).To(ContainSubstring(`"operationid":"test-operation-id"`))
 		Expect(buf2.String()).To(ContainSubstring(`"correlationid":"test-correlation-id"`))
@@ -178,31 +203,6 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 		Expect(buf2.String()).To(ContainSubstring(`"%s":"%s"`, errorDetailsKey, "defaultErrorDetailsvalue"))
 		Expect(buf2.String()).To(ContainSubstring(`"%s":%d`, resultTypeKey, 2))
 		Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
-	})
-
-	It("If either AttributeManager initializer or assigner is nil, default attributes should be set", func() {
-		w := httptest.NewRecorder()
-		req := httptest.NewRequest("GET", "/", nil)
-
-		routerWithoutInitializer := routersMap["without-initializer"]
-		routerWithoutInitializer.ServeHTTP(w, req)
-		cfg := routerCfg["without-initializer"]
-		buf3 := cfg.buf
-
-		checkDefaultAttributes(*buf3, cfg.source, w)
-		Expect(buf3.String()).To(ContainSubstring(`"hello":"world"`)) // assigner was set by user without initializer, but assigner should not be overwritten
-
-		w2 := httptest.NewRecorder()
-		req2 := httptest.NewRequest("GET", "/", nil)
-		routerWithoutAssigner := routersMap["without-assigner"]
-		routerWithoutAssigner.ServeHTTP(w2, req2)
-		cfg4 := routerCfg["without-assigner"]
-		buf4 := cfg4.buf
-
-		checkDefaultAttributes(*buf4, cfg.source, w)
-		Expect(buf4.String()).To(ContainSubstring(`"hello":"world"`)) // initializer was set by user without assigner, but initializer should not be overwritten
-
-		routerWithoutAssigner.ServeHTTP(w, req)
 	})
 })
 
