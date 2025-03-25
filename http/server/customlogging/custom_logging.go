@@ -22,10 +22,6 @@ const (
 	apiRequestLogSource = "ApiRequestLog"
 )
 
-// TODO (Tom): Add a logger wrapper in its own package
-// https://medium.com/@ansujain/building-a-logger-wrapper-in-go-with-support-for-multiple-logging-libraries-48092b826bee
-// more info about http handler here: https://pkg.go.dev/net/http#Handler
-
 // If source is empty, it will be set to "ApiRequestLog"
 // If a field in the attributeAssigner are empty, or the struct itself is empty, default functions will be set
 func NewLogging(logger *slog.Logger, source string, attributeManager AttributeManager) mux.MiddlewareFunc {

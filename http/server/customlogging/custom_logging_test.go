@@ -29,7 +29,7 @@ const (
 	errorDetailsKey      = "errorDetails"
 )
 
-var _ = Describe("HttpMW with Custom Attributes", Ordered, func() {
+var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 	var (
 		customExtractor = func(r *http.Request) map[string]string {
 			return map[string]string{
