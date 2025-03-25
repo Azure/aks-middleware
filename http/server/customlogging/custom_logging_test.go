@@ -213,7 +213,7 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 })
 
 var _ = Describe("Test Helpers", func() {
-	It("test setDefaultInitializerAndAssigner()", func() {
+	It("Test setInitializerAndAssignerIfNil()", func() {
 		attrMgr := &AttributeManager{}
 		setInitializerAndAssignerIfNil(attrMgr)
 		Expect(attrMgr.AttributeAssigner).ToNot(BeNil())

@@ -36,7 +36,7 @@ func NewLogging(logger *slog.Logger, source string, attributeManager AttributeMa
 	}
 }
 
-// enforcing that loggingMiddleware implements the http.Handler interface to ensure safety at compile time
+// Enforcing that loggingMiddleware implements the http.Handler interface to ensure safety at compile time
 var _ http.Handler = &customAttributeLoggingMiddleware{}
 
 type customAttributeLoggingMiddleware struct {
@@ -173,14 +173,14 @@ func flattenAttributes(m map[string]interface{}) []interface{} {
 	return attrList
 }
 
-// sets default source "ApiRequestLog"
+// Sets default source "ApiRequestLog"
 func setSourceIfEmpty(source *string) {
 	if len(*source) == 0 {
 		*source = apiRequestLogSource
 	}
 }
 
-// default attributes set for any request
+// Default attributes set for any request
 func defaultAttributes(source string, r *http.Request) map[string]interface{} {
 	return map[string]interface{}{
 		"source":      &source,

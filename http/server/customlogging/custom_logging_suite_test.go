@@ -9,5 +9,5 @@ import (
 
 func TestCustomLogging(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Custom Logging Suite")
+	RunSpecs(t, "Custom Attribute Logging Suite")
 }
