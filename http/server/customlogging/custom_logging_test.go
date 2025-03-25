@@ -163,8 +163,8 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 			}
 			ctx = context.WithValue(ctx, operationRequestKey, opReq)
 
-			updatedReq := req.WithContext(ctx)
-			routersMap["extra-logging"].ServeHTTP(w, updatedReq)
+			req = req.WithContext(ctx)
+			routersMap["extra-logging"].ServeHTTP(w, req)
 			cfg := routerCfg["extra-logging"]
 			buf2 := cfg.buf
 			Expect(buf2.String()).To(ContainSubstring(`"operationid":"test-operation-id"`))
