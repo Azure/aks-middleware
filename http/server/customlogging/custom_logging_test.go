@@ -84,7 +84,7 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 				AttributeAssigner: func(w http.ResponseWriter, r *http.Request, attrMap map[string]interface{}) map[string]interface{} {
 					opReq := operationRequestFromContext(r.Context())
 					if opReq != nil {
-						attrMap["resourceGroupName"] = opReq.ResourceName
+						attrMap["resourceGroupName"] = opReq.ResourceGroupName
 						attrMap["subscriptionID"] = opReq.SubscriptionID
 					}
 					attrMap["resultType"] = 2
@@ -178,8 +178,8 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 		routerWithoutAssigner.ServeHTTP(w, req)
 	})
 
-	// shows the differentiator for customAttributeLoggingMiddleware as opposed to loggingMiddleware.
-	// resource group name, subscription id, error details, and result type should be set in addition to default varialbes and pre-set headers.
+	// Tests the primary difference between customAttributeLoggingMiddleware and loggingMiddleware
+	// resourceGroupName, subscriptionID errorDetails, and resultType should be set in addition to default varialbes and pre-set headers
 	It("should set values for extra attributes included for logging", func() {
 		w := httptest.NewRecorder()
 		req := httptest.NewRequest("GET", "/", nil)
@@ -187,8 +187,8 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 		req.Header.Set(requestid.RequestCorrelationIDHeader, "test-correlation-id")
 
 		opReq := &OperationRequest{
-			ResourceName:   "test-rgname-value",
-			SubscriptionID: "test-subid-value",
+			ResourceGroupName: "test-rgname-value",
+			SubscriptionID:    "test-subid-value",
 		}
 
 		ctx := context.WithValue(context.Background(), operationRequestKey, opReq)
@@ -248,8 +248,8 @@ var _ = Describe("Test Helpers", func() {
 
 // Used only for testing
 type OperationRequest struct {
-	ResourceName   string
-	SubscriptionID string
+	ResourceGroupName string
+	SubscriptionID    string
 }
 
 type contextKey struct{}
