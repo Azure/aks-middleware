@@ -104,10 +104,6 @@ func (l *customAttributeLoggingMiddleware) ServeHTTP(w http.ResponseWriter, r *h
 	l.LogRequestEnd(ctx, r, "finished call", updatedAttrs)
 }
 
-func (l *customAttributeLoggingMiddleware) BuildLoggingAttributes(ctx context.Context, r *http.Request, extra map[string]interface{}) []interface{} {
-	return BuildAttributes(ctx, l.source, r, extra)
-}
-
 func BuildAttributes(ctx context.Context, source string, r *http.Request, extra map[string]interface{}) []interface{} {
 	md, ok := metadata.FromIncomingContext(ctx)
 
@@ -128,12 +124,12 @@ func BuildAttributes(ctx context.Context, source string, r *http.Request, extra 
 }
 
 func (l *customAttributeLoggingMiddleware) LogRequestStart(ctx context.Context, r *http.Request, msg string, extraAttributes map[string]interface{}) {
-	attributes := l.BuildLoggingAttributes(ctx, r, extraAttributes)
+	attributes := BuildAttributes(ctx, l.source, r, extraAttributes)
 	l.logger.InfoContext(ctx, msg, attributes...)
 }
 
 func (l *customAttributeLoggingMiddleware) LogRequestEnd(ctx context.Context, r *http.Request, msg string, extraAttributes map[string]interface{}) {
-	attributes := l.BuildLoggingAttributes(ctx, r, extraAttributes)
+	attributes := BuildAttributes(ctx, l.source, r, extraAttributes)
 	l.logger.InfoContext(ctx, msg, attributes...)
 }
 

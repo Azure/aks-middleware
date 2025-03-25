@@ -150,7 +150,7 @@ Code example is included in the test code.
 
 ### 4.4. <a id='loggingapirequestresponselogger'></a>custom logging (logging with custom attributes)
 
-The custom attribute logger allows you to add custom fields your service needs for logging **in addition to the request method, URL, status code, and duration** as well as specify a custom "source" which is the table name for your logs to be routed to. If you do not specify a source, the default "ApiRequestLog" is set.
+The custom attribute logger allows you to add custom fields your service needs for logging as well as specify a custom "source" which is the table name for your logs to be routed to. If you do not specify a source, the default "ApiRequestLog" is set.
 
 ##### <a id='Usage-1'></a>Usage
 
@@ -158,7 +158,37 @@ The custom attribute logger allows you to add custom fields your service needs f
 - The AttributeInitializer is called before the request is served and thus should be used to set any fields that remain static or are modified after the request is served by ServeHTTP()
 - The Attribute Assigner is called after serving the request and can be used to udpate existing fields from the initializer or set new fields.
 
-Code example is included in the test code.
+For instance, if you wanted to set the ResultType for a custom struct attached to your request context, you could implement an AttributeAssigner like so:
+
+```
+func(w *customlogging.ResponseRecord, r *http.Request, attributes map[string]interface{}) map[string]interface{} {
+		qosInfo := qos.FromContext(r.Context())
+		// attributes param includes fields already set at beginning of ServeHTTP()
+		switch {
+		case statusCode < 400: // http.StatusBadRequest
+			qosInfo.ResultType = 0
+			qosInfo.ResultCode = "Success"
+		case statusCode < 500: // http.StatusInternalServerError
+			qosInfo.ResultType = 1
+		default:
+			qosInfo.ResultType = 2
+		}
+
+		if ctx.Err() != nil {
+			qosInfo = &qos.QosInfo{
+				ResultType:     3,
+				ResultCode:     ReqCanceledErrorCode,
+				ResultCategory: string(apierror.ClientError),
+				ErrorDetails:   "request context was canceled by caller",
+				InnerMessage:   ctx.Err().Error(),
+				HTTPStatusCode: ReqCanceledHttpCode,
+			}
+		}
+		qosFields := setQosFields(region, qosInfo, statusCode, opReq)
+		return qosFields
+}
+```
+Additional code examples are included in the test code.
 
 ### 4.5. <a id='recovery-1'></a>recovery
 
