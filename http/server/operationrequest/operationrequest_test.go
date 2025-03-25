@@ -90,25 +90,29 @@ var _ = Describe("OperationRequestHelper", func() {
         })
 
         Context("when using a customizer", func() {
-            It("should apply customization to the BaseOperationRequest", func() {
+            It("should apply customization to grab extra info from the request header", func() {
                 url := "/subscriptions/sub4/resourceGroups/rg4/providers/Microsoft.Test/providerType/resourceName/default?api-version=2021-12-01"
                 req = httptest.NewRequest(http.MethodPost, url, strings.NewReader("payload"))
                 req.Header.Set("x-ms-home-tenant-id", "tenant-custom")
                 req.Header.Set("x-ms-correlation-id", "corr-custom")
                 req.Header.Set("Accept-Language", "fr-FR")
+                // Custom information to be extracted
+                req.Header.Set("X-My-Custom-Header", "header-value")
 
                 routeMatch := &mux.RouteMatch{}
                 Expect(router.Match(req, routeMatch)).To(BeTrue())
                 req = mux.SetURLVars(req, routeMatch.Vars)
 
                 customizer := OperationRequestCustomizerFunc(func(op *BaseOperationRequest, headers http.Header, vars map[string]string) error {
-                    op.Extras["custom"] = "value"
+                    if customHeader := headers.Get("X-My-Custom-Header"); customHeader != "" {
+                        op.Extras["myCustomHeader"] = customHeader
+                    }
                     return nil
                 })
                 op, err := NewBaseOperationRequest(req, "region-custom", customizer)
                 Expect(err).NotTo(HaveOccurred())
                 Expect(op).NotTo(BeNil())
-                Expect(op.Extras).To(HaveKeyWithValue("custom", "value"))
+                Expect(op.Extras).To(HaveKeyWithValue("myCustomHeader", "header-value"))
             })
 
             It("should propagate an error from the customizer", func() {
