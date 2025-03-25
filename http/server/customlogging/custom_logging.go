@@ -136,15 +136,25 @@ func (l *customAttributeLoggingMiddleware) LogRequestEnd(ctx context.Context, r 
 // Sets the initializer and/or assigner to a default function if nil
 func setInitializerAndAssignerIfNil(attrManager *AttributeManager) {
 	if attrManager.AttributeInitializer == nil {
-		attrManager.AttributeInitializer = func(w http.ResponseWriter, r *http.Request) map[string]interface{} {
-			return make(map[string]interface{})
-		}
+		attrManager.AttributeInitializer = NewAttributeInitializer()
 	}
 
 	if attrManager.AttributeAssigner == nil {
-		attrManager.AttributeAssigner = func(w http.ResponseWriter, r *http.Request, attrs map[string]interface{}) map[string]interface{} {
-			return make(map[string]interface{}) // returning empty map because BuildAttributes sets default attributes regardless of default or user-defined assigner
-		}
+		attrManager.AttributeAssigner = NewAttributeAssigner()
+	}
+}
+
+// Returns default attribute initializer
+func NewAttributeInitializer() attributeInitializerFunc {
+	return func(w http.ResponseWriter, r *http.Request) map[string]interface{} {
+		return make(map[string]interface{})
+	}
+}
+
+// Returns default attribute assigner
+func NewAttributeAssigner() attributeAssignerFunc {
+	return func(w http.ResponseWriter, r *http.Request, attrs map[string]interface{}) map[string]interface{} {
+		return make(map[string]interface{}) // returning empty map because BuildAttributes sets default attributes regardless of default or user-defined assigner
 	}
 }
 
