@@ -30,7 +30,7 @@ const (
 // If a field in the attributeAssigner are empty, or the struct itself is empty, default functions will be set
 func NewLogging(logger *slog.Logger, source string, attributeManager AttributeManager) mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
-		return &loggingMiddleware{
+		return &customAttributeLoggingMiddleware{
 			next:              next,
 			now:               time.Now,
 			logger:            *logger,
@@ -41,9 +41,9 @@ func NewLogging(logger *slog.Logger, source string, attributeManager AttributeMa
 }
 
 // enforcing that loggingMiddleware implements the http.Handler interface to ensure safety at compile time
-var _ http.Handler = &loggingMiddleware{}
+var _ http.Handler = &customAttributeLoggingMiddleware{}
 
-type loggingMiddleware struct {
+type customAttributeLoggingMiddleware struct {
 	next              http.Handler
 	now               func() time.Time
 	logger            slog.Logger
@@ -68,7 +68,7 @@ func (w *responseWriter) Write(b []byte) (int, error) {
 	return w.ResponseWriter.Write(b)
 }
 
-func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (l *customAttributeLoggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	setSourceIfEmpty(&l.source)
 	addextraattributes := false
 	extraAttributes := make(map[string]interface{})
@@ -103,7 +103,7 @@ func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	l.LogRequestEnd(ctx, r, "finished call", updatedAttrs)
 }
 
-func (l *loggingMiddleware) BuildLoggingAttributes(ctx context.Context, r *http.Request, extra map[string]interface{}) []interface{} {
+func (l *customAttributeLoggingMiddleware) BuildLoggingAttributes(ctx context.Context, r *http.Request, extra map[string]interface{}) []interface{} {
 	return BuildAttributes(ctx, l.source, r, extra)
 }
 
@@ -127,12 +127,12 @@ func BuildAttributes(ctx context.Context, source string, r *http.Request, extra 
 	return attributes
 }
 
-func (l *loggingMiddleware) LogRequestStart(ctx context.Context, r *http.Request, msg string, extraAttributes map[string]interface{}) {
+func (l *customAttributeLoggingMiddleware) LogRequestStart(ctx context.Context, r *http.Request, msg string, extraAttributes map[string]interface{}) {
 	attributes := l.BuildLoggingAttributes(ctx, r, extraAttributes)
 	l.logger.InfoContext(ctx, msg, attributes...)
 }
 
-func (l *loggingMiddleware) LogRequestEnd(ctx context.Context, r *http.Request, msg string, extraAttributes map[string]interface{}) {
+func (l *customAttributeLoggingMiddleware) LogRequestEnd(ctx context.Context, r *http.Request, msg string, extraAttributes map[string]interface{}) {
 	attributes := l.BuildLoggingAttributes(ctx, r, extraAttributes)
 	l.logger.InfoContext(ctx, msg, attributes...)
 }

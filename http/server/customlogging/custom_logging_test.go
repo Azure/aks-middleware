@@ -29,7 +29,7 @@ const (
 	errorDetailsKey      = "errorDetails"
 )
 
-var _ = Describe("Httpmw", func() {
+var _ = Describe("HttpMW with Custom Attributes", Ordered, func() {
 	var (
 		customExtractor = func(r *http.Request) map[string]string {
 			return map[string]string{
@@ -41,11 +41,11 @@ var _ = Describe("Httpmw", func() {
 
 	routerCfg := map[string]*routerConfig{
 		"default": {
-			source:  "ApiRequestLog",
+			source:  apiRequestLogSource,
 			attrMgr: AttributeManager{},
 		},
 		"without-initializer": {
-			source: "ApiRequestLog",
+			source: apiRequestLogSource,
 			// only assigner provided
 			attrMgr: AttributeManager{
 				AttributeAssigner: func(w http.ResponseWriter, r *http.Request, attrs map[string]interface{}) map[string]interface{} {
@@ -54,7 +54,7 @@ var _ = Describe("Httpmw", func() {
 			},
 		},
 		"without-assigner": {
-			source: "ApiRequestLog",
+			source: apiRequestLogSource,
 			// only initializer provided
 			attrMgr: AttributeManager{
 				AttributeInitializer: func(w http.ResponseWriter, r *http.Request) map[string]interface{} {
@@ -103,7 +103,7 @@ var _ = Describe("Httpmw", func() {
 
 	routersMap := map[string]*mux.Router{}
 
-	BeforeEach(func() {
+	BeforeAll(func() {
 		for name, cfg := range routerCfg {
 			routersMap[name] = buildRouter(cfg)
 		}
