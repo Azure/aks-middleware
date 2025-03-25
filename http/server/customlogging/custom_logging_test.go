@@ -27,6 +27,14 @@ const (
 	resourceGroupNameKey = "resourceGroupName"
 	resultTypeKey        = "resultType"
 	errorDetailsKey      = "errorDetails"
+
+	defaultRouterName               = "default"
+	onlyInitializerRouterName       = "only-initializer-set"
+	onlyAssignerRouterName          = "only-assigner-set"
+	extraLoggingVariablesRouterName = "extra-logging-variables-provided"
+
+	customTestKey   = "testKey"
+	customTestValue = "testValue"
 )
 
 var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
@@ -40,29 +48,29 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 	)
 
 	testRoutersConfiguationMap := map[string]*routerConfig{
-		"default": {
+		defaultRouterName: {
 			source:  apiRequestLogSource,
 			attrMgr: AttributeManager{},
 		},
-		"without-initializer": {
+		onlyAssignerRouterName: {
 			source: apiRequestLogSource,
 			// only assigner provided
 			attrMgr: AttributeManager{
 				AttributeAssigner: func(w http.ResponseWriter, r *http.Request, attrs map[string]interface{}) map[string]interface{} {
-					return map[string]interface{}{"hello": "world"}
+					return map[string]interface{}{customTestKey: customTestValue}
 				},
 			},
 		},
-		"without-assigner": {
+		onlyInitializerRouterName: {
 			source: apiRequestLogSource,
 			// only initializer provided
 			attrMgr: AttributeManager{
 				AttributeInitializer: func(w http.ResponseWriter, r *http.Request) map[string]interface{} {
-					return map[string]interface{}{"hello": "world"}
+					return map[string]interface{}{customTestKey: customTestValue}
 				},
 			},
 		},
-		"extra-logging": {
+		extraLoggingVariablesRouterName: {
 			source: "customSource",
 			attrMgr: AttributeManager{
 				AttributeInitializer: func(w http.ResponseWriter, r *http.Request) map[string]interface{} {
@@ -112,9 +120,9 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 	It("should log and return OK status", func() {
 		w := httptest.NewRecorder()
 		req := httptest.NewRequest("GET", "/", nil)
-		routersMap["default"].ServeHTTP(w, req)
+		routersMap[defaultRouterName].ServeHTTP(w, req)
 
-		cfg := testRoutersConfiguationMap["default"]
+		cfg := testRoutersConfiguationMap[defaultRouterName]
 		buf := cfg.buf
 		Expect(cfg.buf).To(ContainSubstring("finished call"))
 		Expect(buf).To(ContainSubstring(`"source":"ApiRequestLog"`))
@@ -133,9 +141,9 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 		req.Header.Set(requestid.RequestAcsOperationIDHeader, "test-operation-id")
 		req.Header.Set(requestid.RequestCorrelationIDHeader, "test-correlation-id")
 
-		routersMap["default"].ServeHTTP(w, req)
+		routersMap[defaultRouterName].ServeHTTP(w, req)
 
-		cfg := testRoutersConfiguationMap["default"]
+		cfg := testRoutersConfiguationMap[defaultRouterName]
 		buf := cfg.buf
 		Expect(buf.String()).To(ContainSubstring(`"operationid":"test-operation-id"`))
 		Expect(buf.String()).To(ContainSubstring(`"correlationid":"test-correlation-id"`))
@@ -147,50 +155,47 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 		w := httptest.NewRecorder()
 		req := httptest.NewRequest("GET", "/", nil)
 
-		routerWithoutInitializer := routersMap["without-initializer"]
+		routerWithoutInitializer := routersMap[onlyAssignerRouterName]
 		routerWithoutInitializer.ServeHTTP(w, req)
-		cfg := testRoutersConfiguationMap["without-initializer"]
+		cfg := testRoutersConfiguationMap[onlyAssignerRouterName]
 		buf3 := cfg.buf
 
 		checkDefaultAttributes(*buf3, cfg.source, w)
-		Expect(buf3.String()).To(ContainSubstring(`"hello":"world"`)) // assigner was set by user without initializer, but assigner should not be overwritten
+		// assigner was set by user without initializer, but assigner should not be overwritten
+		Expect(buf3.String()).To(ContainSubstring(`"%s":"%s"`, customTestKey, customTestValue))
 
 		w2 := httptest.NewRecorder()
 		req2 := httptest.NewRequest("GET", "/", nil)
-		routerWithoutAssigner := routersMap["without-assigner"]
+		routerWithoutAssigner := routersMap[onlyInitializerRouterName]
 		routerWithoutAssigner.ServeHTTP(w2, req2)
-		cfg4 := testRoutersConfiguationMap["without-assigner"]
+		cfg4 := testRoutersConfiguationMap[onlyInitializerRouterName]
 		buf4 := cfg4.buf
 
 		checkDefaultAttributes(*buf4, cfg.source, w)
-		Expect(buf4.String()).To(ContainSubstring(`"hello":"world"`)) // initializer was set by user without assigner, but initializer should not be overwritten
+		// initializer was set by user without assigner, but initializer should not be overwritten
+		Expect(buf4.String()).To(ContainSubstring(`"%s":"%s"`, customTestKey, customTestValue))
 
 		routerWithoutAssigner.ServeHTTP(w, req)
 	})
 
+	// shows the differentiator for customAttributeLoggingMiddleware as opposed to loggingMiddleware.
+	// resource group name, subscription id, error details, and result type should be set in addition to default varialbes and pre-set headers.
 	It("should set values for extra attributes included for logging", func() {
 		w := httptest.NewRecorder()
 		req := httptest.NewRequest("GET", "/", nil)
 		req.Header.Set(requestid.RequestAcsOperationIDHeader, "test-operation-id")
 		req.Header.Set(requestid.RequestCorrelationIDHeader, "test-correlation-id")
 
-		type ctxkey string
-		rgkey := ctxkey(resourceGroupNameKey)
-		subkey := ctxkey(subscriptionIDKey)
-
-		ctx := context.Background()
-		// extra logging attributes, the differentiator between customAttributeLoggingMiddleware and loggingMiddleware. Resource group name, subscription id, error details, and result type should be set in addition to default attributes
-		ctx = context.WithValue(ctx, rgkey, "test-rgname-value")
-		ctx = context.WithValue(ctx, subkey, "test-subid-value")
 		opReq := &OperationRequest{
 			ResourceName:   "test-rgname-value",
 			SubscriptionID: "test-subid-value",
 		}
-		ctx = context.WithValue(ctx, operationRequestKey, opReq)
+
+		ctx := context.WithValue(context.Background(), operationRequestKey, opReq)
 
 		req = req.WithContext(ctx)
-		routersMap["extra-logging"].ServeHTTP(w, req)
-		cfg := testRoutersConfiguationMap["extra-logging"]
+		routersMap[extraLoggingVariablesRouterName].ServeHTTP(w, req)
+		cfg := testRoutersConfiguationMap[extraLoggingVariablesRouterName]
 		buf2 := cfg.buf
 		Expect(buf2.String()).To(ContainSubstring(`"operationid":"test-operation-id"`))
 		Expect(buf2.String()).To(ContainSubstring(`"correlationid":"test-correlation-id"`))
@@ -223,16 +228,16 @@ var _ = Describe("Test Helpers", func() {
 
 	It("Test flattenAttributes()", func() {
 		attrMap := map[string]interface{}{
-			"hello":   "world",
-			"latency": 2,
+			customTestKey: customTestValue,
+			"latency":     2,
 		}
 
 		attrList := flattenAttributes(attrMap)
 		Expect(len(attrList)).To(Equal(4))
 
 		for i, val := range attrList {
-			if val == "hello" {
-				Expect(attrList[i+1]).To(Equal("world"))
+			if val == customTestKey {
+				Expect(attrList[i+1]).To(Equal(customTestValue))
 			}
 			if val == "latency" {
 				Expect(attrList[i+1]).To(Equal(2))
