@@ -109,102 +109,100 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 		}
 	})
 
-	Describe("LoggingMiddleware", func() {
-		It("should log and return OK status", func() {
-			w := httptest.NewRecorder()
-			req := httptest.NewRequest("GET", "/", nil)
-			routersMap["default"].ServeHTTP(w, req)
+	It("should log and return OK status", func() {
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest("GET", "/", nil)
+		routersMap["default"].ServeHTTP(w, req)
 
-			cfg := routerCfg["default"]
-			buf := cfg.buf
-			Expect(cfg.buf).To(ContainSubstring("finished call"))
-			Expect(buf).To(ContainSubstring(`"source":"ApiRequestLog"`))
-			Expect(buf.String()).To(ContainSubstring(`"protocol":"HTTP"`))
-			Expect(buf.String()).To(ContainSubstring(`"method_type":"unary"`))
-			Expect(buf.String()).To(ContainSubstring(`"component":"server"`))
-			Expect(buf.String()).To(ContainSubstring(`"time_ms":`))
-			Expect(buf.String()).To(ContainSubstring(`"service":"`))
-			Expect(buf.String()).To(ContainSubstring(`"url":"`))
-			Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
-		})
+		cfg := routerCfg["default"]
+		buf := cfg.buf
+		Expect(cfg.buf).To(ContainSubstring("finished call"))
+		Expect(buf).To(ContainSubstring(`"source":"ApiRequestLog"`))
+		Expect(buf.String()).To(ContainSubstring(`"protocol":"HTTP"`))
+		Expect(buf.String()).To(ContainSubstring(`"method_type":"unary"`))
+		Expect(buf.String()).To(ContainSubstring(`"component":"server"`))
+		Expect(buf.String()).To(ContainSubstring(`"time_ms":`))
+		Expect(buf.String()).To(ContainSubstring(`"service":"`))
+		Expect(buf.String()).To(ContainSubstring(`"url":"`))
+		Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
+	})
 
-		It("should log operationID and correlationID from headers", func() {
-			w := httptest.NewRecorder()
-			req := httptest.NewRequest("GET", "/", nil)
-			req.Header.Set(requestid.RequestAcsOperationIDHeader, "test-operation-id")
-			req.Header.Set(requestid.RequestCorrelationIDHeader, "test-correlation-id")
+	It("should log operationID and correlationID from headers", func() {
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest("GET", "/", nil)
+		req.Header.Set(requestid.RequestAcsOperationIDHeader, "test-operation-id")
+		req.Header.Set(requestid.RequestCorrelationIDHeader, "test-correlation-id")
 
-			routersMap["default"].ServeHTTP(w, req)
+		routersMap["default"].ServeHTTP(w, req)
 
-			cfg := routerCfg["default"]
-			buf := cfg.buf
-			Expect(buf.String()).To(ContainSubstring(`"operationid":"test-operation-id"`))
-			Expect(buf.String()).To(ContainSubstring(`"correlationid":"test-correlation-id"`))
-			Expect(buf.String()).ToNot(ContainSubstring(`"armclientrequestid"`))
-			Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
-		})
+		cfg := routerCfg["default"]
+		buf := cfg.buf
+		Expect(buf.String()).To(ContainSubstring(`"operationid":"test-operation-id"`))
+		Expect(buf.String()).To(ContainSubstring(`"correlationid":"test-correlation-id"`))
+		Expect(buf.String()).ToNot(ContainSubstring(`"armclientrequestid"`))
+		Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
+	})
 
-		It("should set values for extra attributes included for logging", func() {
-			w := httptest.NewRecorder()
-			req := httptest.NewRequest("GET", "/", nil)
-			req.Header.Set(requestid.RequestAcsOperationIDHeader, "test-operation-id")
-			req.Header.Set(requestid.RequestCorrelationIDHeader, "test-correlation-id")
+	It("should set values for extra attributes included for logging", func() {
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest("GET", "/", nil)
+		req.Header.Set(requestid.RequestAcsOperationIDHeader, "test-operation-id")
+		req.Header.Set(requestid.RequestCorrelationIDHeader, "test-correlation-id")
 
-			type ctxkey string
-			rgkey := ctxkey(resourceGroupNameKey)
-			subkey := ctxkey(subscriptionIDKey)
+		type ctxkey string
+		rgkey := ctxkey(resourceGroupNameKey)
+		subkey := ctxkey(subscriptionIDKey)
 
-			ctx := context.Background()
-			ctx = context.WithValue(ctx, rgkey, "test-rgname-value")
-			ctx = context.WithValue(ctx, subkey, "test-subid-value")
-			opReq := &OperationRequest{
-				ResourceName:   "test-rgname-value",
-				SubscriptionID: "test-subid-value",
-			}
-			ctx = context.WithValue(ctx, operationRequestKey, opReq)
+		ctx := context.Background()
+		ctx = context.WithValue(ctx, rgkey, "test-rgname-value")
+		ctx = context.WithValue(ctx, subkey, "test-subid-value")
+		opReq := &OperationRequest{
+			ResourceName:   "test-rgname-value",
+			SubscriptionID: "test-subid-value",
+		}
+		ctx = context.WithValue(ctx, operationRequestKey, opReq)
 
-			req = req.WithContext(ctx)
-			routersMap["extra-logging"].ServeHTTP(w, req)
-			cfg := routerCfg["extra-logging"]
-			buf2 := cfg.buf
-			Expect(buf2.String()).To(ContainSubstring(`"operationid":"test-operation-id"`))
-			Expect(buf2.String()).To(ContainSubstring(`"correlationid":"test-correlation-id"`))
-			Expect(buf2.String()).ToNot(ContainSubstring(`"armclientrequestid"`))
+		req = req.WithContext(ctx)
+		routersMap["extra-logging"].ServeHTTP(w, req)
+		cfg := routerCfg["extra-logging"]
+		buf2 := cfg.buf
+		Expect(buf2.String()).To(ContainSubstring(`"operationid":"test-operation-id"`))
+		Expect(buf2.String()).To(ContainSubstring(`"correlationid":"test-correlation-id"`))
+		Expect(buf2.String()).ToNot(ContainSubstring(`"armclientrequestid"`))
 
-			checkDefaultAttributes(*buf2, cfg.source, w)
+		checkDefaultAttributes(*buf2, cfg.source, w)
 
-			// check extra attributes
-			Expect(buf2.String()).To(ContainSubstring(`"%s":"%s"`, resourceGroupNameKey, "test-rgname-value"))
-			Expect(buf2.String()).To(ContainSubstring(`"%s":"%s"`, subscriptionIDKey, "test-subid-value"))
-			Expect(buf2.String()).To(ContainSubstring(`"%s":"%s"`, errorDetailsKey, "defaultErrorDetailsvalue"))
-			Expect(buf2.String()).To(ContainSubstring(`"%s":%d`, resultTypeKey, 2))
-			Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
-		})
+		// check extra attributes
+		Expect(buf2.String()).To(ContainSubstring(`"%s":"%s"`, resourceGroupNameKey, "test-rgname-value"))
+		Expect(buf2.String()).To(ContainSubstring(`"%s":"%s"`, subscriptionIDKey, "test-subid-value"))
+		Expect(buf2.String()).To(ContainSubstring(`"%s":"%s"`, errorDetailsKey, "defaultErrorDetailsvalue"))
+		Expect(buf2.String()).To(ContainSubstring(`"%s":%d`, resultTypeKey, 2))
+		Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
+	})
 
-		It("If either AttributeManager initializer or assigner is nil, default attributes should be set", func() {
-			w := httptest.NewRecorder()
-			req := httptest.NewRequest("GET", "/", nil)
+	It("If either AttributeManager initializer or assigner is nil, default attributes should be set", func() {
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest("GET", "/", nil)
 
-			routerWithoutInitializer := routersMap["without-initializer"]
-			routerWithoutInitializer.ServeHTTP(w, req)
-			cfg := routerCfg["without-initializer"]
-			buf3 := cfg.buf
+		routerWithoutInitializer := routersMap["without-initializer"]
+		routerWithoutInitializer.ServeHTTP(w, req)
+		cfg := routerCfg["without-initializer"]
+		buf3 := cfg.buf
 
-			checkDefaultAttributes(*buf3, cfg.source, w)
-			Expect(buf3.String()).To(ContainSubstring(`"hello":"world"`)) // assigner was set by user without initializer, but assigner should not be overwritten
+		checkDefaultAttributes(*buf3, cfg.source, w)
+		Expect(buf3.String()).To(ContainSubstring(`"hello":"world"`)) // assigner was set by user without initializer, but assigner should not be overwritten
 
-			w2 := httptest.NewRecorder()
-			req2 := httptest.NewRequest("GET", "/", nil)
-			routerWithoutAssigner := routersMap["without-assigner"]
-			routerWithoutAssigner.ServeHTTP(w2, req2)
-			cfg4 := routerCfg["without-assigner"]
-			buf4 := cfg4.buf
+		w2 := httptest.NewRecorder()
+		req2 := httptest.NewRequest("GET", "/", nil)
+		routerWithoutAssigner := routersMap["without-assigner"]
+		routerWithoutAssigner.ServeHTTP(w2, req2)
+		cfg4 := routerCfg["without-assigner"]
+		buf4 := cfg4.buf
 
-			checkDefaultAttributes(*buf4, cfg.source, w)
-			Expect(buf4.String()).To(ContainSubstring(`"hello":"world"`)) // initializer was set by user without assigner, but initializer should not be overwritten
+		checkDefaultAttributes(*buf4, cfg.source, w)
+		Expect(buf4.String()).To(ContainSubstring(`"hello":"world"`)) // initializer was set by user without assigner, but initializer should not be overwritten
 
-			routerWithoutAssigner.ServeHTTP(w, req)
-		})
+		routerWithoutAssigner.ServeHTTP(w, req)
 	})
 })
 
