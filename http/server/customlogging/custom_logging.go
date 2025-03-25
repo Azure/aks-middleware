@@ -178,16 +178,3 @@ func setSourceIfEmpty(source *string) {
 		*source = apiRequestLogSource
 	}
 }
-
-// Default attributes set for any request
-// func defaultAttributes(source string, r *http.Request) map[string]interface{} {
-// 	return map[string]interface{}{
-// 		"source":      &source,
-// 		"protocol":    "HTTP",
-// 		"method_type": "unary",
-// 		"component":   "server",
-// 		"method":      r.Method,
-// 		"service":     r.Host,
-// 		"url":         r.URL.String(),
-// 	}
-// }
