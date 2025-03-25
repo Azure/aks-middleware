@@ -9,6 +9,7 @@ require (
 	buf.build/gen/go/service-hub/loggable/protocolbuffers/go v1.32.0-20231012175355-a349f6324a7e.1
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.9.1
 	github.com/bufbuild/protovalidate-go v0.4.3
+	github.com/gofrs/uuid v4.4.0+incompatible
 	github.com/gorilla/mux v1.8.1
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.0.1
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.24.0
