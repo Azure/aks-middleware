@@ -10,12 +10,12 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-type attributeInitializerFunc func(w http.ResponseWriter, r *http.Request) map[string]interface{}
-type attributeAssignerFunc func(w http.ResponseWriter, r *http.Request, attrs map[string]interface{}) map[string]interface{}
+type AttributeInitializerFunc func(w http.ResponseWriter, r *http.Request) map[string]interface{}
+type AttributeAssignerFunc func(w http.ResponseWriter, r *http.Request, attrs map[string]interface{}) map[string]interface{}
 
 type AttributeManager struct {
-	AttributeInitializer attributeInitializerFunc // sets keys for custom attributes at the beginning of ServeHTTP()
-	AttributeAssigner    attributeAssignerFunc    // assigns values for custom attributes after request has completed
+	AttributeInitializer AttributeInitializerFunc // sets keys for custom attributes at the beginning of ServeHTTP()
+	AttributeAssigner    AttributeAssignerFunc    // assigns values for custom attributes after request has completed
 }
 
 const (
@@ -145,14 +145,14 @@ func setInitializerAndAssignerIfNil(attrManager *AttributeManager) {
 }
 
 // Returns default attribute initializer
-func NewAttributeInitializer() attributeInitializerFunc {
+func NewAttributeInitializer() AttributeInitializerFunc {
 	return func(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 		return make(map[string]interface{})
 	}
 }
 
 // Returns default attribute assigner
-func NewAttributeAssigner() attributeAssignerFunc {
+func NewAttributeAssigner() AttributeAssignerFunc {
 	return func(w http.ResponseWriter, r *http.Request, attrs map[string]interface{}) map[string]interface{} {
 		return make(map[string]interface{}) // returning empty map because BuildAttributes sets default attributes regardless of default or user-defined assigner
 	}
