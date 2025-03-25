@@ -124,14 +124,8 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 
 		cfg := testRoutersConfiguationMap[defaultRouterName]
 		buf := cfg.buf
-		Expect(cfg.buf).To(ContainSubstring("finished call"))
+		Expect(buf).To(ContainSubstring("finished call"))
 		Expect(buf).To(ContainSubstring(`"source":"ApiRequestLog"`))
-		Expect(buf.String()).To(ContainSubstring(`"protocol":"HTTP"`))
-		Expect(buf.String()).To(ContainSubstring(`"method_type":"unary"`))
-		Expect(buf.String()).To(ContainSubstring(`"component":"server"`))
-		Expect(buf.String()).To(ContainSubstring(`"time_ms":`))
-		Expect(buf.String()).To(ContainSubstring(`"service":"`))
-		Expect(buf.String()).To(ContainSubstring(`"url":"`))
 		Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
 	})
 
@@ -160,7 +154,6 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 		cfg := testRoutersConfiguationMap[onlyAssignerRouterName]
 		buf3 := cfg.buf
 
-		checkDefaultAttributes(*buf3, cfg.source, w)
 		// assigner was set by user without initializer, but assigner should not be overwritten
 		Expect(buf3.String()).To(ContainSubstring(`"%s":"%s"`, customTestKey, customTestValue))
 
@@ -171,7 +164,6 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 		cfg4 := testRoutersConfiguationMap[onlyInitializerRouterName]
 		buf4 := cfg4.buf
 
-		checkDefaultAttributes(*buf4, cfg.source, w)
 		// initializer was set by user without assigner, but initializer should not be overwritten
 		Expect(buf4.String()).To(ContainSubstring(`"%s":"%s"`, customTestKey, customTestValue))
 
@@ -179,7 +171,7 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 	})
 
 	// Tests the primary difference between customAttributeLoggingMiddleware and loggingMiddleware
-	// resourceGroupName, subscriptionID errorDetails, and resultType should be set in addition to default varialbes and pre-set headers
+	// resourceGroupName, subscriptionID errorDetails, and resultType should be set in addition to pre-set headers
 	It("should set values for extra attributes included for logging", func() {
 		w := httptest.NewRecorder()
 		req := httptest.NewRequest("GET", "/", nil)
@@ -200,8 +192,6 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 		Expect(buf2.String()).To(ContainSubstring(`"operationid":"test-operation-id"`))
 		Expect(buf2.String()).To(ContainSubstring(`"correlationid":"test-correlation-id"`))
 		Expect(buf2.String()).ToNot(ContainSubstring(`"armclientrequestid"`))
-
-		checkDefaultAttributes(*buf2, cfg.source, w)
 
 		// check extra attributes
 		Expect(buf2.String()).To(ContainSubstring(`"%s":"%s"`, resourceGroupNameKey, "test-rgname-value"))
@@ -267,16 +257,4 @@ func operationRequestFromContext(ctx context.Context) *OperationRequest {
 func (op *OperationRequest) copy() *OperationRequest {
 	r := *op
 	return &r
-}
-
-func checkDefaultAttributes(buf bytes.Buffer, source string, w *httptest.ResponseRecorder) {
-	Expect(buf.String()).To(ContainSubstring("finished call"))
-	Expect(buf.String()).To(ContainSubstring(`"source":"%s"`, source))
-	Expect(buf.String()).To(ContainSubstring(`"protocol":"HTTP"`))
-	Expect(buf.String()).To(ContainSubstring(`"method_type":"unary"`))
-	Expect(buf.String()).To(ContainSubstring(`"component":"server"`))
-	Expect(buf.String()).To(ContainSubstring(`"time_ms":`))
-	Expect(buf.String()).To(ContainSubstring(`"service":"`))
-	Expect(buf.String()).To(ContainSubstring(`"url":"`))
-	Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
 }

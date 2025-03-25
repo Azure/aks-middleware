@@ -120,10 +120,9 @@ func BuildAttributes(ctx context.Context, source string, r *http.Request, extra 
 		}
 	}
 
-	attributes := flattenAttributes(defaultAttributes(source, r))
 	flattened := flattenAttributes(extra)
+	attributes := []interface{}{"source", source}
 	attributes = append(attributes, flattened...)
-
 	attributes = append(attributes, "headers", headers)
 	return attributes
 }
@@ -181,14 +180,14 @@ func setSourceIfEmpty(source *string) {
 }
 
 // Default attributes set for any request
-func defaultAttributes(source string, r *http.Request) map[string]interface{} {
-	return map[string]interface{}{
-		"source":      &source,
-		"protocol":    "HTTP",
-		"method_type": "unary",
-		"component":   "server",
-		"method":      r.Method,
-		"service":     r.Host,
-		"url":         r.URL.String(),
-	}
-}
+// func defaultAttributes(source string, r *http.Request) map[string]interface{} {
+// 	return map[string]interface{}{
+// 		"source":      &source,
+// 		"protocol":    "HTTP",
+// 		"method_type": "unary",
+// 		"component":   "server",
+// 		"method":      r.Method,
+// 		"service":     r.Host,
+// 		"url":         r.URL.String(),
+// 	}
+// }
