@@ -148,7 +148,19 @@ To use the logging middleware, you need to create a logger and then apply the mi
 
 Code example is included in the test code.
 
-### 4.4. <a id='recovery-1'></a>recovery
+### 4.4. <a id='loggingapirequestresponselogger'></a>custom logging (logging with custom attributes)
+
+The custom attribute logger allows you to add custom fields your service needs for logging **in addition to the request method, URL, status code, and duration** as well as specify a custom "source" which is the table name for your logs to be routed to. If you do not specify a source, the default "ApiRequestLog" is set.
+
+##### <a id='Usage-1'></a>Usage
+
+. To add extra logging fields and values, set the ``attributeInitializerFunc`` and/or ``attributeAssignerFunc`` on the ``AttributeManager`` struct. 
+- The AttributeInitializer is called before the request is served and thus should be used to set any fields that remain static or are modified after the request is served by ServeHTTP()
+- The Attribute Assigner is called after serving the request and can be used to udpate existing fields from the initializer or set new fields.
+
+Code example is included in the test code.
+
+### 4.5. <a id='recovery-1'></a>recovery
 
 The recovery middleware recovers from panics in your HTTP handlers and logs the error. It can use a custom panic handler if provided.
 
@@ -158,7 +170,7 @@ To use the recovery middleware, you need to create a logger and apply the middle
 
 Code example is included in the test code
 
-### 4.5. <a id='inputvalidate'></a>inputvalidate
+### 4.6. <a id='inputvalidate'></a>inputvalidate
 
 Missing.
 
