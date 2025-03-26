@@ -19,10 +19,10 @@ type AttributeManager struct {
 }
 
 const (
-	apiRequestLogSource = "ApiRequestLog"
+	ctxLogSource = "CtxLog"
 )
 
-// If source is empty, it will be set to "ApiRequestLog"
+// If source is empty, it will be set to "CtxLog"
 // If a field in the attributeAssigner are empty, or the struct itself is empty, default functions will be set
 func NewLogging(logger *slog.Logger, source string, attributeManager AttributeManager) mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
@@ -75,7 +75,7 @@ func (l *customAttributeLoggingMiddleware) ServeHTTP(w http.ResponseWriter, r *h
 
 	customWriter := &ResponseRecord{ResponseWriter: w}
 
-	if l.attributemManager != nil || l.source == apiRequestLogSource {
+	if l.attributemManager != nil || l.source == ctxLogSource {
 		addextraattributes = true
 		setInitializerAndAssignerIfNil(l.attributemManager)
 		extraAttributes = (l.attributemManager.AttributeInitializer)(customWriter, r)
@@ -168,9 +168,9 @@ func flattenAttributes(m map[string]interface{}) []interface{} {
 	return attrList
 }
 
-// Sets default source "ApiRequestLog"
+// Sets default source "CtxLog"
 func setSourceIfEmpty(source *string) {
 	if len(*source) == 0 {
-		*source = apiRequestLogSource
+		*source = ctxLogSource
 	}
 }

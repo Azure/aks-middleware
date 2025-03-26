@@ -49,11 +49,11 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 
 	testRoutersConfiguationMap := map[string]*routerConfig{
 		defaultRouterName: {
-			source:  apiRequestLogSource,
+			source:  ctxLogSource,
 			attrMgr: AttributeManager{},
 		},
 		onlyAssignerRouterName: {
-			source: apiRequestLogSource,
+			source: ctxLogSource,
 			// only assigner provided
 			attrMgr: AttributeManager{
 				AttributeAssigner: func(w *ResponseRecord, r *http.Request, attrs map[string]interface{}) map[string]interface{} {
@@ -62,7 +62,7 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 			},
 		},
 		onlyInitializerRouterName: {
-			source: apiRequestLogSource,
+			source: ctxLogSource,
 			// only initializer provided
 			attrMgr: AttributeManager{
 				AttributeInitializer: func(w *ResponseRecord, r *http.Request) map[string]interface{} {
@@ -125,7 +125,7 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 		cfg := testRoutersConfiguationMap[defaultRouterName]
 		buf := cfg.buf
 		Expect(buf).To(ContainSubstring("finished call"))
-		Expect(buf).To(ContainSubstring(`"source":"ApiRequestLog"`))
+		Expect(buf).To(ContainSubstring(`"source":"CtxLog"`))
 		Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
 	})
 
