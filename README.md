@@ -150,7 +150,7 @@ Code example is included in the test code.
 
 ### 4.4. <a id='loggingapirequestresponselogger'></a>custom logging (logging with custom attributes)
 
-The custom attribute logger allows you to add custom fields your service needs for logging as well as specify a custom "source" which is the table name for your logs to be routed to. If you do not specify a source, the default "ApiRequestLog" is set.
+The custom attribute logger allows you to add custom fields your service needs for logging as well as specify a custom "source" which is the table name for your logs to be routed to. If you do not specify a source, the default "CtxLog" is set. Your logs will be grouped in a separate column in CtxLog.
 
 ##### <a id='Usage-1'></a>Usage
 
