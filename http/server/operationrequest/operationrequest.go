@@ -12,7 +12,7 @@ import (
 
 // NewOperationRequest creates an operationRequestMiddleware with an optional customizer.
 // Use nil for customizer when no customization is needed.
-func NewOperationRequest(region string, customizer OperationRequestCustomizer) mux.MiddlewareFunc {
+func NewOperationRequest(region string, customizer OperationRequestCustomizerFunc) mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return &operationRequestMiddleware{
 			next:       next,
@@ -29,7 +29,7 @@ var _ http.Handler = &operationRequestMiddleware{}
 type operationRequestMiddleware struct {
 	next       http.Handler
 	region     string
-	customizer OperationRequestCustomizer
+	customizer OperationRequestCustomizerFunc
 }
 
 func (op *operationRequestMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
