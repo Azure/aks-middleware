@@ -35,9 +35,9 @@ type operationRequestMiddleware struct {
 func (op *operationRequestMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	opReq, err := NewBaseOperationRequest(r, op.region, op.customizer)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("%v", err), http.StatusInternalServerError)
-		return
-	}
+        http.Error(w, fmt.Errorf("failed to create operation request: %w", err).Error(), http.StatusInternalServerError)
+        return
+    }
 
 	ctx := r.Context()
 	ctx = OperationRequestWithContext(ctx, opReq)
