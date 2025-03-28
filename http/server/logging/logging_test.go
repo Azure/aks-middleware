@@ -41,6 +41,7 @@ var _ = Describe("Httpmw Integration Test", func() {
             CustomOperationDescs:      make(map[string]string),
             CustomOperationCategories: map[string]msgs.OperationCategory{},
             OperationAccessLevel:      "Test Contributor Role",
+            ExcludeAuditEvents: map[string][]string{},
         }
         // Initialize common logger and router
         buf = new(bytes.Buffer)
@@ -65,7 +66,6 @@ var _ = Describe("Httpmw Integration Test", func() {
 
     Describe("LoggingMiddleware with Real Audit Client", func() {
         It("should log and return OK status", func() {
-            // No need to reinitialize logger or middleware here.
             w := httptest.NewRecorder()
             req := httptest.NewRequest("GET", "/", nil)
 
@@ -99,8 +99,6 @@ var _ = Describe("Httpmw Integration Test", func() {
         })
 
         It("should send audit event on request completion", func() {
-            // Reuse the existing router & logger
-            // Instead of reinitializing, simply set needed headers.
             w := httptest.NewRecorder()
             req := httptest.NewRequest("GET", "/", nil)
             req.Header.Set("User-Agent", "TestAgent")
@@ -120,7 +118,6 @@ var _ = Describe("Httpmw Integration Test", func() {
                 CustomOperationDescs: make(map[string]string),
                 OperationAccessLevel: "Azure Kubernetes Fleet Manager Contributor Role",
             }
-            // Use a separate router for this test to avoid altering the global one.
             localRouter := mux.NewRouter()
             localRouter.Use(NewLogging(slogLogger, nilConfig))
             localRouter.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
@@ -144,7 +141,6 @@ var _ = Describe("Httpmw Integration Test", func() {
                 },
                 OperationAccessLevel: "Test Contributor Role",
             }
-            // Use a separate router for this test.
             localRouter := mux.NewRouter()
             localRouter.Use(NewLogging(slogLogger, updatedOtelConfig))
             localRouter.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
@@ -161,7 +157,6 @@ var _ = Describe("Httpmw Integration Test", func() {
         })
 
         It("should log an error when the record object is invalid", func() {
-            // Do not set any headers so that caller identities are missing.
             w := httptest.NewRecorder()
             req := httptest.NewRequest("GET", "/", nil)
 
@@ -199,7 +194,6 @@ var _ = Describe("Httpmw Integration Test", func() {
         It("should extract buffered response body as error message", func() {
             localRouter := mux.NewRouter()
             localRouter.Use(NewLogging(slogLogger, otelConfig))
-            // Setup an error endpoint.
             localRouter.HandleFunc("/error", func(w http.ResponseWriter, r *http.Request) {
                 http.Error(w, "simulated error occurred", http.StatusBadRequest)
             })
@@ -215,6 +209,31 @@ var _ = Describe("Httpmw Integration Test", func() {
             logOutput := buf.String()
             Expect(logOutput).To(ContainSubstring("simulated error occurred"))
             Expect(logOutput).To(ContainSubstring("sending audit logs"))
+        })
+
+        It("should not send audit event if request matches exclusion criteria", func() {
+            localOtelConfig := &OtelConfig{
+                Client:                    createAuditClient(),
+                CustomOperationDescs:      make(map[string]string),
+                CustomOperationCategories: map[string]msgs.OperationCategory{},
+                OperationAccessLevel:      "Test Contributor Role",
+                ExcludeAuditEvents: map[string][]string{
+                    "GET": {"/exclude"},
+                },
+            }
+            localRouter := mux.NewRouter()
+            localRouter.Use(NewLogging(slogLogger, localOtelConfig))
+            localRouter.HandleFunc("/exclude", func(w http.ResponseWriter, r *http.Request) {
+                w.WriteHeader(http.StatusOK)
+            })
+
+            w := httptest.NewRecorder()
+            req := httptest.NewRequest("GET", "/exclude", nil)
+            localRouter.ServeHTTP(w, req)
+
+            logOutput := buf.String()
+            Expect(logOutput).ToNot(ContainSubstring("sending audit logs"))
+            Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
         })
     })
 })
