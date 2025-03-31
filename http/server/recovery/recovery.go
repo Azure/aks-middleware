@@ -17,9 +17,8 @@ import (
 const (
 	// Panic logging info
 
-	LineNumKey = "LINE"
-	UrlKey     = "URL"
-
+	LineNumKey      = "LINE"
+	UrlKey          = "URL"
 	FilePathKey     = "FILE_PATH"
 	PanicMessageKey = "MESSAGE"
 )
@@ -55,7 +54,7 @@ func (p *panicHandlingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Reque
 	defer func() {
 		if err := recover(); err != nil {
 			p.panicHandler(p.logger, w, r, err)
-			r = SavePanicInfoToCtx(r, err)
+			r = SavePanicInfoToCtx(r, err, "")
 		}
 	}()
 	p.next.ServeHTTP(w, r)
@@ -80,11 +79,14 @@ func parseStack(stack string) (string, string) {
 	return file, linenum
 }
 
-func SavePanicInfoToCtx(r *http.Request, err interface{}) *http.Request {
+func SavePanicInfoToCtx(r *http.Request, err interface{}, stack string) *http.Request {
 	// get the file and line number where the panic occurred
 	// panic is terminated by custom recovery function and program continues
-	stack := debug.Stack()
-	file, linenum := parseStack(string(stack))
+	if len(stack) == 0 {
+		stack = string(debug.Stack())
+	}
+
+	file, linenum := parseStack(stack)
 
 	path := file
 	if strings.Contains(path, "aks-rp") {
