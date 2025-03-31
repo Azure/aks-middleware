@@ -21,6 +21,7 @@
  	* 4.3. [logging (api request/response logger)](#loggingapirequestresponselogger)
  	* 4.4. [recovery](#recovery-1)
  	* 4.5. [inputvalidate](#inputvalidate)
+	* 4.6  [operationrequest](#operationrequest)
 * 5. [HTTP client via Azure SDK](#HTTPclientviaAzureSDK)
  	* 5.1. [mdforward](#mdforward-1)
  	* 5.2. [policy (api request/response logger)](#policyapirequestresponselogger)
@@ -160,6 +161,45 @@ Code example is included in the test code
 ### 4.5. <a id='inputvalidate'></a>inputvalidate
 
 Missing.
+
+### 4.6. <a id='operationrequest'></a>operationrequest
+
+The `operationrequest` middleware is designed to handle and enrich incoming HTTP requests with additional context and metadata. It extracts common fields from the request, such as subscription ID, resource group, correlation ID, operation ID, and more. It also allows for customization through the use of a customizer function.
+
+#### <a id='Usage-2'></a>Usage
+
+To use the `operationrequest` middleware, you need to create an instance of the middleware with the desired options and apply it to your router.
+
+```go
+import (
+    "github.com/Azure/aks-middleware/http/server/operationrequest"
+    "github.com/gorilla/mux"
+)
+
+type MyExtras struct {
+    MyCustomHeader string
+}
+
+func myCustomizer(extras *MyExtras, headers http.Header, vars map[string]string) error {
+    if customHeader := headers.Get("X-My-Custom-Header"); customHeader != "" {
+        extras.MyCustomHeader = customHeader
+    }
+    return nil
+}
+
+func main() {
+    router := mux.NewRouter()
+    opts := operationrequest.OperationRequestOptions[MyExtras]{
+        Extras:     MyExtras{},
+        Customizer: myCustomizer,
+    }
+    router.Use(operationrequest.NewOperationRequest("region-name", opts))
+    // Add your routes here
+    http.ListenAndServe(":8080", router)
+}
+```
+
+This middleware will enrich the incoming requests with additional context and metadata, making it easier to handle and process the requests in your application.
 
 ## 5. <a id='HTTPclientviaAzureSDK'></a>HTTP client via Azure SDK
 
