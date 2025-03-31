@@ -2,7 +2,6 @@ package customlogging
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -10,7 +9,6 @@ import (
 	"github.com/gorilla/mux"
 	"google.golang.org/grpc/metadata"
 
-	middlewarecommon "github.com/Azure/aks-middleware/common"
 	"github.com/Azure/aks-middleware/http/common"
 )
 
@@ -192,15 +190,9 @@ func flattenAttributes(m map[string]interface{}) []interface{} {
 
 func defaultCtxLogAttributes(r *http.Request) []interface{} {
 	var level slog.Level
-	var msg any
-	var location, request string
+	var request string
 	if r.Context().Err() != nil {
 		level = slog.LevelError
-		msg = r.Context().Value("panic")
-
-		errInfo := middlewarecommon.GetPanicInfo()
-		location = fmt.Sprintf("%s:%s", errInfo[middlewarecommon.FilePathKey], errInfo[middlewarecommon.LineNumKey])
-		request = errInfo[middlewarecommon.UrlKey]
 	} else {
 		level = slog.LevelInfo
 		request = r.URL.Path
@@ -210,9 +202,8 @@ func defaultCtxLogAttributes(r *http.Request) []interface{} {
 		"source", ctxLogSource,
 		"time", time.Now(),
 		"level", level,
-		"location", location,
-		"msg", msg,
 		"request_id", r.Header.Get(common.RequestIDMetadataHeader),
 		"request", request,
+		"method", r.Method,
 	}
 }
