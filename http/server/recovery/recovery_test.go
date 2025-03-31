@@ -36,7 +36,6 @@ var _ = Describe("Httpmw", func() {
 
 			Expect(w.Body.String()).To(ContainSubstring("Bad Request"))
 			Expect(w.Result().StatusCode).To(Equal(400))
-
 		})
 
 		It("should use default handler if custom handler is not passed", func() {
