@@ -14,12 +14,26 @@ import (
     . "github.com/onsi/gomega"
 )
 
-var _ = Describe("OperationRequestHelper", func() {
+type MyExtras struct {
+    MyCustomHeader string
+}
+
+var _ = Describe("OperationRequestHelper using MyExtras", func() {
     var (
         req    *http.Request
         router *mux.Router
     )
     validURL := "/subscriptions/sub3/resourceGroups/rg3/providers/Microsoft.Test/providerType/resourceName/default?api-version=2021-12-01"
+
+    // no-op customizer for MyExtras
+    noOpCustomizer := OperationRequestCustomizerFunc[MyExtras](func(extras *MyExtras, headers http.Header, vars map[string]string) error {
+        return nil
+    })
+
+    defaultOpts := OperationRequestOptions[MyExtras]{
+        Extras:     MyExtras{},
+        Customizer: noOpCustomizer,
+    }
 
     BeforeEach(func() {
         // setup a router for matching URL variables
@@ -37,7 +51,7 @@ var _ = Describe("OperationRequestHelper", func() {
             Expect(router.Match(req, routeMatch)).To(BeTrue())
             req = mux.SetURLVars(req, routeMatch.Vars)
 
-            op, err := NewBaseOperationRequest(req, "region-test", nil)
+            op, err := NewBaseOperationRequest(req, "region-test", defaultOpts)
             Expect(err).To(HaveOccurred())
             Expect(err.Error()).To(ContainSubstring("no api-version in URI's parameters"))
             Expect(op).To(BeNil())
@@ -53,7 +67,7 @@ var _ = Describe("OperationRequestHelper", func() {
             Expect(router.Match(req, routeMatch)).To(BeTrue())
             req = mux.SetURLVars(req, routeMatch.Vars)
 
-            op, err := NewBaseOperationRequest(req, "region-test", nil)
+            op, err := NewBaseOperationRequest(req, "region-test", defaultOpts)
             Expect(err).NotTo(HaveOccurred())
             Expect(op).NotTo(BeNil())
             Expect(op.APIVersion).To(Equal("2021-12-01"))
@@ -78,7 +92,7 @@ var _ = Describe("OperationRequestHelper", func() {
             Expect(router.Match(req, routeMatch)).To(BeTrue())
             req = mux.SetURLVars(req, routeMatch.Vars)
 
-            op, err := NewBaseOperationRequest(req, "region-test", nil)
+            op, err := NewBaseOperationRequest(req, "region-test", defaultOpts)
             Expect(err).NotTo(HaveOccurred())
             Expect(op).NotTo(BeNil())
             Expect(op.OperationID).To(Equal(providedOpID))
@@ -91,25 +105,31 @@ var _ = Describe("OperationRequestHelper", func() {
                 req.Header.Set(common.RequestAcceptLanguageHeader, "fr-FR")
                 // Custom information to be extracted
                 req.Header.Set("X-My-Custom-Header", "header-value")
-        
+
                 routeMatch := &mux.RouteMatch{}
                 Expect(router.Match(req, routeMatch)).To(BeTrue())
                 req = mux.SetURLVars(req, routeMatch.Vars)
-        
-                customizer := OperationRequestCustomizerFunc(func(extras map[string]interface{}, headers http.Header, vars map[string]string) error {
+
+                customizer := OperationRequestCustomizerFunc[MyExtras](func(extras *MyExtras, headers http.Header, vars map[string]string) error {
                     if customHeader := headers.Get("X-My-Custom-Header"); customHeader != "" {
-                        extras["myCustomHeader"] = customHeader
+                        extras.MyCustomHeader = customHeader
                     }
                     // Attempt to modify extracted URI vars (this change should not persist in BaseOperationRequest)
                     vars[common.SubscriptionIDKey] = "modified-subscription"
                     return nil
                 })
-                op, err := NewBaseOperationRequest(req, "region-custom", customizer)
+
+                opts := OperationRequestOptions[MyExtras]{
+                    Extras:     MyExtras{},
+                    Customizer: customizer,
+                }
+
+                op, err := NewBaseOperationRequest(req, "region-custom", opts)
                 Expect(err).NotTo(HaveOccurred())
                 Expect(op).NotTo(BeNil())
                 // Verify that custom field is added.
-                Expect(op.Extras).To(HaveKeyWithValue("myCustomHeader", "header-value"))
-        
+                Expect(op.Extras.MyCustomHeader).To(Equal("header-value"))
+
                 // Verify extracted fields remain unchanged.
                 Expect(op.APIVersion).To(Equal("2021-12-01"))
                 Expect(op.SubscriptionID).To(Equal("sub3"))
@@ -120,17 +140,22 @@ var _ = Describe("OperationRequestHelper", func() {
 
             It("should propagate an error from the customizer", func() {
                 req = httptest.NewRequest(http.MethodPost, validURL, nil)
-        
+
                 routeMatch := &mux.RouteMatch{}
                 Expect(router.Match(req, routeMatch)).To(BeTrue())
                 req = mux.SetURLVars(req, routeMatch.Vars)
-        
+
                 customErr := errors.New("custom error")
-                customizer := OperationRequestCustomizerFunc(func(extras map[string]interface{}, headers http.Header, vars map[string]string) error {
+                customizer := OperationRequestCustomizerFunc[MyExtras](func(extras *MyExtras, headers http.Header, vars map[string]string) error {
                     return customErr
                 })
-        
-                op, err := NewBaseOperationRequest(req, "region-custom", customizer)
+
+                opts := OperationRequestOptions[MyExtras]{
+                    Extras:     MyExtras{},
+                    Customizer: customizer,
+                }
+
+                op, err := NewBaseOperationRequest(req, "region-custom", opts)
                 Expect(err).To(HaveOccurred())
                 Expect(err).To(Equal(customErr))
                 Expect(op).To(BeNil())

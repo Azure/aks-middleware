@@ -14,7 +14,7 @@ import (
 )
 
 // BaseOperationRequest contains the common fields.
-type BaseOperationRequest struct {
+type BaseOperationRequest[T any] struct {
     APIVersion       string
     SubscriptionID   string
     ResourceGroup    string
@@ -30,17 +30,23 @@ type BaseOperationRequest struct {
     ResourceType     string
     ResourceName     string
     // extra fields can be stored in Extras if needed
-    Extras map[string]interface{}
+    Extras T
 }
 
-type OperationRequestCustomizerFunc func(extras map[string]interface{}, headers http.Header, vars map[string]string) error
+// OperationRequestCustomizerFunc is a function to customize the extras.
+type OperationRequestCustomizerFunc[T any] func(extras *T, headers http.Header, vars map[string]string) error
+
+type OperationRequestOptions[T any] struct {
+    Extras     T
+    Customizer OperationRequestCustomizerFunc[T]
+}
 
 // NewBaseOperationRequest constructs the common part of OperationRequest.
-// It applies the customizer (if provided) so that the caller can add extra information.
-func NewBaseOperationRequest(req *http.Request, region string, customizer OperationRequestCustomizerFunc) (*BaseOperationRequest, error) {
-    op := &BaseOperationRequest{
+// It applies the customizer provided in the options so that the caller can add extra information.
+func NewBaseOperationRequest[T any](req *http.Request, region string, opts OperationRequestOptions[T]) (*BaseOperationRequest[T], error) {
+    op := &BaseOperationRequest[T]{
         Request: req,
-        Extras:  make(map[string]interface{}),
+        Extras:  opts.Extras,
     }
     query := req.URL.Query()
     headers := req.Header
@@ -76,9 +82,9 @@ func NewBaseOperationRequest(req *http.Request, region string, customizer Operat
         op.RouteName = currRoute.GetName()
     }
 
-    // Allow the caller to customize via Extras only.
-    if customizer != nil {
-        if err := customizer(op.Extras, headers, vars); err != nil {
+    // Allow the caller to customize via the provided OperationRequestOptions.
+    if opts.Customizer != nil {
+        if err := opts.Customizer(&op.Extras, headers, vars); err != nil {
             return nil, err
         }
     }
@@ -87,12 +93,12 @@ func NewBaseOperationRequest(req *http.Request, region string, customizer Operat
 
 type contextKey struct{}
 
-func OperationRequestWithContext(ctx context.Context, op *BaseOperationRequest) context.Context {
+func OperationRequestWithContext[T any](ctx context.Context, op *BaseOperationRequest[T]) context.Context {
     return context.WithValue(ctx, contextKey{}, op)
 }
 
-func OperationRequestFromContext(ctx context.Context) *BaseOperationRequest {
-    if op, ok := ctx.Value(contextKey{}).(*BaseOperationRequest); ok {
+func OperationRequestFromContext[T any](ctx context.Context) *BaseOperationRequest[T] {
+    if op, ok := ctx.Value(contextKey{}).(*BaseOperationRequest[T]); ok {
         return op
     }
     return nil
