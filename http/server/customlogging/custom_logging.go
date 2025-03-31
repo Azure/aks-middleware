@@ -193,7 +193,7 @@ func flattenAttributes(m map[string]interface{}) []interface{} {
 func defaultCtxLogAttributes(r *http.Request) []interface{} {
 	var level slog.Level
 	var msg any
-	var location, request, version, branch string
+	var location, request string
 	if r.Context().Err() != nil {
 		level = slog.LevelError
 		msg = r.Context().Value("panic")
@@ -201,8 +201,6 @@ func defaultCtxLogAttributes(r *http.Request) []interface{} {
 		errInfo := middlewarecommon.GetPanicInfo()
 		location = fmt.Sprintf("%s:%s", errInfo[middlewarecommon.FilePathKey], errInfo[middlewarecommon.LineNumKey])
 		request = errInfo[middlewarecommon.UrlKey]
-		version = errInfo[middlewarecommon.VersionKey]
-		branch = errInfo[middlewarecommon.VersionKey]
 	} else {
 		level = slog.LevelInfo
 		request = r.URL.Path
@@ -216,7 +214,5 @@ func defaultCtxLogAttributes(r *http.Request) []interface{} {
 		"msg", msg,
 		"request_id", r.Header.Get(common.RequestIDMetadataHeader),
 		"request", request,
-		"version", version,
-		"branch", branch,
 	}
 }

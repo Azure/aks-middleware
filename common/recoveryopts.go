@@ -17,7 +17,6 @@ const (
 	FilePathKey = "FILE_PATH"
 	LineNumKey  = "LINE"
 	UrlKey      = "URL"
-	VersionKey  = "VERSION"
 	PanicKey    = ""
 )
 
@@ -84,7 +83,6 @@ func GetPanicInfo() map[string]string {
 		FilePathKey: file,
 		LineNumKey:  linenum,
 		UrlKey:      url,
-		VersionKey:  version,
 	}
 }
 
