@@ -3,6 +3,7 @@ package customlogging
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -101,7 +102,7 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 		cfg.buf = new(bytes.Buffer)
 		cfg.logger = slog.New(slog.NewJSONHandler(cfg.buf, nil))
 
-		r.Use(NewLogging(cfg.logger, cfg.source, cfg.attrMgr))
+		r.Use(NewLogging(*cfg.logger, cfg.source, cfg.attrMgr))
 		r.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 			time.Sleep(10 * time.Millisecond)
 			w.WriteHeader(http.StatusOK)
@@ -120,12 +121,21 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 	It("should log and return OK status", func() {
 		w := httptest.NewRecorder()
 		req := httptest.NewRequest("GET", "/", nil)
+		req.Header.Set(requestid.RequestARMClientRequestIDHeader, "test-request-id")
+
 		routersMap[defaultRouterName].ServeHTTP(w, req)
 
 		cfg := testRoutersConfigurationMap[defaultRouterName]
 		buf := cfg.buf
+		fmt.Println("buf string")
+		fmt.Println(buf.String())
+
 		Expect(buf).To(ContainSubstring("finished call"))
 		Expect(buf).To(ContainSubstring(`"source":"CtxLog"`))
+		Expect(buf).To(ContainSubstring(`"time":`))
+		Expect(buf).To(ContainSubstring(`"level":"INFO"`))
+		Expect(buf).To(ContainSubstring(`"%s":"%s"`, "request_id", "test-request-id"))
+		Expect(buf).To(ContainSubstring(`"method":"GET"`))
 		Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
 	})
 

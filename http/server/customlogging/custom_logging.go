@@ -26,14 +26,14 @@ const (
 
 // If source is empty, it will be set to "CtxLog"
 // If a field in the attributeAssigner are empty, or the struct itself is empty, default functions will be set
-func NewLogging(logger *slog.Logger, source string, attributeManager AttributeManager) mux.MiddlewareFunc {
+func NewLogging(logger slog.Logger, source string, attributeManager AttributeManager) mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return &customAttributeLoggingMiddleware{
-			next:              next,
-			now:               time.Now,
-			logger:            *logger,
-			source:            source,
-			attributemManager: &attributeManager,
+			next:             next,
+			now:              time.Now,
+			logger:           logger,
+			source:           source,
+			attributeManager: &attributeManager,
 		}
 	}
 }
@@ -42,11 +42,11 @@ func NewLogging(logger *slog.Logger, source string, attributeManager AttributeMa
 var _ http.Handler = &customAttributeLoggingMiddleware{}
 
 type customAttributeLoggingMiddleware struct {
-	next              http.Handler
-	now               func() time.Time
-	logger            slog.Logger
-	source            string
-	attributemManager *AttributeManager
+	next             http.Handler
+	now              func() time.Time
+	logger           slog.Logger
+	source           string
+	attributeManager *AttributeManager
 }
 
 type ResponseRecord struct {
@@ -80,10 +80,10 @@ func (l *customAttributeLoggingMiddleware) ServeHTTP(w http.ResponseWriter, r *h
 
 	customWriter := &ResponseRecord{ResponseWriter: w}
 
-	if l.attributemManager != nil || l.source == ctxLogSource {
+	if l.attributeManager != nil || l.source == ctxLogSource {
 		addextraattributes = true
-		setInitializerAndAssignerIfNil(l.attributemManager)
-		extraAttributes = (l.attributemManager.AttributeInitializer)(customWriter, r)
+		setInitializerAndAssignerIfNil(l.attributeManager)
+		extraAttributes = (l.attributeManager.AttributeInitializer)(customWriter, r)
 	}
 
 	startTime := l.now()
@@ -105,7 +105,7 @@ func (l *customAttributeLoggingMiddleware) ServeHTTP(w http.ResponseWriter, r *h
 
 	var updatedAttrs map[string]interface{}
 	if addextraattributes {
-		updatedAttrs = (l.attributemManager.AttributeAssigner)(customWriter, r, extraAttributes)
+		updatedAttrs = (l.attributeManager.AttributeAssigner)(customWriter, r, extraAttributes)
 	} else {
 		updatedAttrs = extraAttributes
 	}
@@ -202,7 +202,7 @@ func defaultCtxLogAttributes(r *http.Request) []interface{} {
 		"source", ctxLogSource,
 		"time", time.Now(),
 		"level", level,
-		"request_id", r.Header.Get(common.RequestIDMetadataHeader),
+		"request_id", r.Header.Get(common.RequestARMClientRequestIDHeader),
 		"request", request,
 		"method", r.Method,
 	}
