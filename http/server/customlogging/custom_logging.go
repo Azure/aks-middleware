@@ -2,12 +2,16 @@ package customlogging
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/gorilla/mux"
 	"google.golang.org/grpc/metadata"
+
+	middlewarecommon "github.com/Azure/aks-middleware/common"
+	"github.com/Azure/aks-middleware/http/common"
 )
 
 type AttributeInitializerFunc func(w *ResponseRecord, r *http.Request) map[string]interface{}
@@ -69,7 +73,10 @@ func (r *ResponseRecord) StatusCode() int {
 }
 
 func (l *customAttributeLoggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	setSourceIfEmpty(&l.source)
+	if len(l.source) == 0 {
+		l.source = ctxLogSource
+	}
+
 	addextraattributes := false
 	extraAttributes := make(map[string]interface{})
 
@@ -85,6 +92,14 @@ func (l *customAttributeLoggingMiddleware) ServeHTTP(w http.ResponseWriter, r *h
 	ctx := r.Context()
 
 	l.LogRequestStart(ctx, r, "RequestStart", extraAttributes)
+
+	defer func() {
+		if err := recover(); err != nil {
+			ctx = context.WithValue(ctx, "panic", err)
+			r = r.WithContext(ctx)
+		}
+	}()
+
 	l.next.ServeHTTP(customWriter, r.WithContext(ctx))
 	endTime := l.now()
 
@@ -116,9 +131,16 @@ func BuildAttributes(ctx context.Context, source string, r *http.Request, extra 
 		}
 	}
 
-	flattened := flattenAttributes(extra)
-	attributes := []interface{}{"source", source}
-	attributes = append(attributes, flattened...)
+	var attributes []interface{}
+	if source == ctxLogSource { // do not flatten attributes, they will be added to  "log" column
+		attributes = defaultCtxLogAttributes(r)
+		attributes = append(attributes, "log", extra)
+	} else {
+		flattened := flattenAttributes(extra)
+		attributes = append(attributes, "source", source)
+		attributes = append(attributes, flattened...)
+	}
+
 	attributes = append(attributes, "headers", headers)
 	return attributes
 }
@@ -168,9 +190,33 @@ func flattenAttributes(m map[string]interface{}) []interface{} {
 	return attrList
 }
 
-// Sets default source "CtxLog"
-func setSourceIfEmpty(source *string) {
-	if len(*source) == 0 {
-		*source = ctxLogSource
+func defaultCtxLogAttributes(r *http.Request) []interface{} {
+	var level slog.Level
+	var msg any
+	var location, request, version, branch string
+	if r.Context().Err() != nil {
+		level = slog.LevelError
+		msg = r.Context().Value("panic")
+
+		errInfo := middlewarecommon.GetPanicInfo()
+		location = fmt.Sprintf("%s:%s", errInfo[middlewarecommon.FilePathKey], errInfo[middlewarecommon.LineNumKey])
+		request = errInfo[middlewarecommon.UrlKey]
+		version = errInfo[middlewarecommon.VersionKey]
+		branch = errInfo[middlewarecommon.VersionKey]
+	} else {
+		level = slog.LevelInfo
+		request = r.URL.Path
+	}
+
+	return []interface{}{
+		"source", ctxLogSource,
+		"time", time.Now(),
+		"level", level,
+		"location", location,
+		"msg", msg,
+		"request_id", r.Header.Get(common.RequestIDMetadataHeader),
+		"request", request,
+		"version", version,
+		"branch", branch,
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"io"
 	"os"
 
+	middlewarecommon "github.com/Azure/aks-middleware/common"
 	"github.com/Azure/aks-middleware/grpc/client/mdforward"
 	"github.com/Azure/aks-middleware/grpc/common"
 	"github.com/Azure/aks-middleware/grpc/common/autologger"
@@ -146,6 +147,6 @@ func DefaultServerInterceptors(options ServerInterceptorLogOptions) []grpc.Unary
 			logging.WithFieldsFromContext(common.GetFields),
 		),
 		responseheader.UnaryServerInterceptor(httpcommon.MetadataToHeader),
-		recovery.UnaryServerInterceptor(common.GetRecoveryOpts()...),
+		recovery.UnaryServerInterceptor(middlewarecommon.GetRecoveryOpts()...),
 	}
 }

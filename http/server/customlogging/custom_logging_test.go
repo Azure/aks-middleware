@@ -47,7 +47,7 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 		}
 	)
 
-	testRoutersConfiguationMap := map[string]*routerConfig{
+	testRoutersConfigurationMap := map[string]*routerConfig{
 		defaultRouterName: {
 			source:  ctxLogSource,
 			attrMgr: AttributeManager{},
@@ -112,7 +112,7 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 	routersMap := map[string]*mux.Router{}
 
 	BeforeAll(func() {
-		for name, cfg := range testRoutersConfiguationMap {
+		for name, cfg := range testRoutersConfigurationMap {
 			routersMap[name] = buildRouter(cfg)
 		}
 	})
@@ -122,7 +122,7 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 		req := httptest.NewRequest("GET", "/", nil)
 		routersMap[defaultRouterName].ServeHTTP(w, req)
 
-		cfg := testRoutersConfiguationMap[defaultRouterName]
+		cfg := testRoutersConfigurationMap[defaultRouterName]
 		buf := cfg.buf
 		Expect(buf).To(ContainSubstring("finished call"))
 		Expect(buf).To(ContainSubstring(`"source":"CtxLog"`))
@@ -137,7 +137,7 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 
 		routersMap[defaultRouterName].ServeHTTP(w, req)
 
-		cfg := testRoutersConfiguationMap[defaultRouterName]
+		cfg := testRoutersConfigurationMap[defaultRouterName]
 		buf := cfg.buf
 		Expect(buf.String()).To(ContainSubstring(`"operationid":"test-operation-id"`))
 		Expect(buf.String()).To(ContainSubstring(`"correlationid":"test-correlation-id"`))
@@ -151,7 +151,7 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 
 		routerWithoutInitializer := routersMap[onlyAssignerRouterName]
 		routerWithoutInitializer.ServeHTTP(w, req)
-		cfg := testRoutersConfiguationMap[onlyAssignerRouterName]
+		cfg := testRoutersConfigurationMap[onlyAssignerRouterName]
 		buf3 := cfg.buf
 
 		// assigner was set by user without initializer, but assigner should not be overwritten
@@ -161,7 +161,7 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 		req2 := httptest.NewRequest("GET", "/", nil)
 		routerWithoutAssigner := routersMap[onlyInitializerRouterName]
 		routerWithoutAssigner.ServeHTTP(w2, req2)
-		cfg4 := testRoutersConfiguationMap[onlyInitializerRouterName]
+		cfg4 := testRoutersConfigurationMap[onlyInitializerRouterName]
 		buf4 := cfg4.buf
 
 		// initializer was set by user without assigner, but initializer should not be overwritten
@@ -187,7 +187,7 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 
 		req = req.WithContext(ctx)
 		routersMap[extraLoggingVariablesRouterName].ServeHTTP(w, req)
-		cfg := testRoutersConfiguationMap[extraLoggingVariablesRouterName]
+		cfg := testRoutersConfigurationMap[extraLoggingVariablesRouterName]
 		buf2 := cfg.buf
 		Expect(buf2.String()).To(ContainSubstring(`"operationid":"test-operation-id"`))
 		Expect(buf2.String()).To(ContainSubstring(`"correlationid":"test-correlation-id"`))
