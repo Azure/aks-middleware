@@ -17,8 +17,8 @@
  	* 3.3. [retry](#retry)
 * 4. [HTTP server](#HTTPserver)
  	* 4.1. [requestid](#requestid-1)
- 	* 4.2. [ctxlogger (applogger)](#ctxloggerapplogger-1)
- 	* 4.3. [logging (api request/response logger)](#loggingapirequestresponselogger)
+ 	* 4.2. [logging (api request/response logger)](#loggingapirequestresponselogger)
+ 	* 4.3. [ctxlogger/custom attribute logger (applogger)](#httpctxlogger)
  	* 4.4. [recovery](#recovery-1)
  	* 4.5. [inputvalidate](#inputvalidate)
 	* 4.6  [operationrequest](#operationrequest)
@@ -134,11 +134,8 @@ It extracts Azure Resource Manager required HTTP headers from the request and pu
 
 The current implementation is not consistent with its gRPC counterpart.
 
-### 4.2. <a id='ctxloggerapplogger-1'></a>ctxlogger (applogger)
 
-Missing.
-
-### 4.3. <a id='loggingapirequestresponselogger'></a>logging (api request/response logger)
+### 4.2. <a id='loggingapirequestresponselogger'></a>logging (api request/response logger)
 
 The logging middleware logs details about each HTTP request and response, including the request method, URL, status code, and duration.
 
@@ -148,9 +145,9 @@ To use the logging middleware, you need to create a logger and then apply the mi
 
 Code example is included in the test code.
 
-### 4.4. <a id='loggingapirequestresponselogger'></a>custom logging (logging with custom attributes)
+### 4.3. <a id='httpctxlogger'></a>ctx logging/ custom logging (logging with custom attributes)
 
-The custom attribute logger allows you to add custom fields your service needs for logging as well as specify a custom "source" which is the table name for your logs to be routed to. If you do not specify a source, the default "CtxLog" is set. Your logs will be grouped in a separate column in CtxLog.
+The custom attribute logger allows you to add custom fields your service needs for logging as well as specify a custom "source" which is the table name for your logs to be routed to. If you do not specify a source, the default "CtxLog" is set. The default fields include "source", "time", "level", "request_id", "request", and "method." In order to have information from a panic also logged (filepath with line number where panic originated, and panic message), you must call the [recovery middleware](https://github.com/Azure/aks-middleware/blob/main/http/server/recovery/recovery.go) first
 
 ##### <a id='Usage-1'></a>Usage
 
@@ -190,7 +187,7 @@ func(w *customlogging.ResponseRecord, r *http.Request, attributes map[string]int
 ```
 Additional code examples are included in the test code.
 
-### 4.5. <a id='recovery-1'></a>recovery
+### 4.4. <a id='recovery-1'></a>recovery
 
 The recovery middleware recovers from panics in your HTTP handlers and logs the error. It can use a custom panic handler if provided.
 
@@ -200,7 +197,7 @@ To use the recovery middleware, you need to create a logger and apply the middle
 
 Code example is included in the test code
 
-### 4.6. <a id='inputvalidate'></a>inputvalidate
+### 4.5. <a id='inputvalidate'></a>inputvalidate
 
 Missing.
 

@@ -16,9 +16,6 @@ import (
 
 const (
 	// Panic logging info
-
-	LineNumKey      = "LINE"
-	UrlKey          = "URL"
 	FilePathKey     = "FILE_PATH"
 	PanicMessageKey = "MESSAGE"
 )
