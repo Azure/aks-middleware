@@ -2,6 +2,7 @@ package customlogging
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -71,6 +72,7 @@ func (r *ResponseRecord) StatusCode() int {
 }
 
 func (l *customAttributeLoggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("source: ", l.source)
 	if len(l.source) == 0 {
 		l.source = ctxLogSource
 	}
@@ -130,7 +132,7 @@ func BuildAttributes(ctx context.Context, source string, r *http.Request, extra 
 	}
 
 	var attributes []interface{}
-	if source == ctxLogSource { // do not flatten attributes, they will be added to  "log" column
+	if source == ctxLogSource { // do not flatten attributes, they will be added to "log" column
 		attributes = defaultCtxLogAttributes(r)
 		attributes = append(attributes, "log", extra)
 	} else {
