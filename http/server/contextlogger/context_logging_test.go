@@ -1,4 +1,4 @@
-package customlogging
+package httpcontextlogger
 
 import (
 	"bytes"
