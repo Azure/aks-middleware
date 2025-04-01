@@ -1,4 +1,4 @@
-package httpcontextlogger
+package contextlogger
 
 import (
 	"testing"
