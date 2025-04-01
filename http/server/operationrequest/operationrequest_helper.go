@@ -25,7 +25,7 @@ type BaseOperationRequest[T any] struct {
     HttpMethod       string
     Body             []byte
     RouteName        string
-    Request          *http.Request
+    Request          *http.Request `json:"-"`
     Region           string
     ResourceType     string
     ResourceName     string
