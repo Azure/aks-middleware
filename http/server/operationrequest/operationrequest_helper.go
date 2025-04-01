@@ -41,15 +41,37 @@ type OperationRequestOptions[T any] struct {
     Customizer OperationRequestCustomizerFunc[T]
 }
 
-// NewBaseOperationRequest constructs the common part of OperationRequest.
-// It applies the customizer provided in the options so that the caller can add extra information.
+// NewBaseOperationRequest constructs the BaseOperationRequest.
+// It extracts data from the HTTP request in the following order:
+//   1. URL and Query: Extract api-version and target URI.
+//   2. Headers: Extract correlation ID, accepted language, and operation ID.
+//   3. Route Variables: Extract subscription ID, resource group, resource provider/type, and resource name.
+//   4. Method & Body: Capture the HTTP method and read the request body.
+//   5. Route Name: Optionally capture the route name from mux.CurrentRoute.
+//   6. Customization: Allow further customization of extras.
 func NewBaseOperationRequest[T any](req *http.Request, region string, opts OperationRequestOptions[T]) (*BaseOperationRequest[T], error) {
     op := &BaseOperationRequest[T]{
         Request: req,
         Extras:  opts.Extras,
     }
     query := req.URL.Query()
+    op.APIVersion = query.Get(common.APIVersionKey)
+    // if the api-version is not present in the URL, return an error
+    // this is a required parameter for the operation
+    if op.APIVersion == "" {
+        return nil, errors.New("no api-version in URI's parameters")
+    }
+    op.TargetURI = req.URL.String()
+
     headers := req.Header
+    op.CorrelationID = headers.Get(common.RequestCorrelationIDHeader)
+    op.AcceptedLanguage = strings.ToLower(headers.Get(common.RequestAcceptLanguageHeader))
+    if opID := headers.Get(common.RequestAcsOperationIDHeader); opID == "" {
+        op.OperationID = uuid.Must(uuid.NewV4()).String()
+    } else {
+        op.OperationID = uuid.Must(uuid.FromString(opID)).String()
+    }
+    op.HttpMethod = req.Method
 
     vars := mux.Vars(req)
     op.SubscriptionID = vars[common.SubscriptionIDKey]
@@ -57,20 +79,6 @@ func NewBaseOperationRequest[T any](req *http.Request, region string, opts Opera
     op.ResourceType = vars[common.ResourceProviderKey] + "/" + vars[common.ResourceTypeKey]
     op.ResourceName = vars[common.ResourceNameKey]
     op.Region = region
-
-    op.APIVersion = query.Get(common.APIVersionKey)
-    if op.APIVersion == "" {
-        return nil, errors.New("no api-version in URI's parameters")
-    }
-    op.CorrelationID = headers.Get(common.RequestCorrelationIDHeader)
-    if opID := headers.Get(common.RequestAcsOperationIDHeader); opID == "" {
-        op.OperationID = uuid.Must(uuid.NewV4()).String()
-    } else {
-        op.OperationID = uuid.Must(uuid.FromString(opID)).String()
-    }
-    op.AcceptedLanguage = strings.ToLower(headers.Get(common.RequestAcceptLanguageHeader))
-    op.TargetURI = req.URL.String()
-    op.HttpMethod = req.Method
 
     body, err := io.ReadAll(req.Body)
     if err != nil {
@@ -82,7 +90,6 @@ func NewBaseOperationRequest[T any](req *http.Request, region string, opts Opera
         op.RouteName = currRoute.GetName()
     }
 
-    // Allow the caller to customize via the provided OperationRequestOptions.
     if opts.Customizer != nil {
         if err := opts.Customizer(&op.Extras, headers, vars); err != nil {
             return nil, err
