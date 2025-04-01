@@ -1,4 +1,4 @@
-package logging
+package otelaudit
 
 import (
 	"context"
@@ -18,30 +18,31 @@ type OtelConfig struct {
 	CustomOperationDescs      map[string]string
 	CustomOperationCategories map[string]msgs.OperationCategory
 	OperationAccessLevel      string
-	// map of HTTP method to list of request URLs to exclude from audit
-	// key is the HTTP method (e.g. "GET", "POST") and the value is a list of request URIs to ignore
+	// map of HTTP method to list of request URIs to exclude from audit
 	ExcludeAuditEvents map[string][]string
 }
 
-func (l *loggingMiddleware) sendOtelAuditEvent(ctx context.Context, statusCode int, req *http.Request, errorMsg string) {
-	if l.otelConfig == nil || l.otelConfig.Client == nil {
-		l.logger.Error("otel configuration or client is nil")
+// SendOtelAuditEvent sends an OTEL audit event using the provided logger and configuration.
+// This function replaces the method attached to loggingMiddleware.
+func SendOtelAuditEvent(logger *slog.Logger, otelConfig *OtelConfig, ctx context.Context, statusCode int, req *http.Request, errorMsg string) {
+	if otelConfig == nil || otelConfig.Client == nil {
+		logger.Error("otel configuration or client is nil")
 		return
 	}
 
-	if shouldExcludeAudit(req, l.otelConfig.ExcludeAuditEvents) {
+	if shouldExcludeAudit(req, otelConfig.ExcludeAuditEvents) {
 		return
 	}
 
-	msg, err := createOtelAuditEvent(l.logger, statusCode, req, l.otelConfig, errorMsg)
+	msg, err := createOtelAuditEvent(logger, statusCode, req, otelConfig, errorMsg)
 	if err != nil {
-		l.logger.Error("failed to create audit event", "error", err)
+		logger.Error("failed to create audit event", "error", err)
 		return
 	}
 
-	l.logger.Info("sending audit logs")
-	if err := l.otelConfig.Client.Send(ctx, msg); err != nil {
-		l.logger.Error("failed to send audit event", "error", err)
+	logger.Info("sending audit logs")
+	if err := otelConfig.Client.Send(ctx, msg); err != nil {
+		logger.Error("failed to send audit event", "error", err)
 	}
 }
 
@@ -105,12 +106,9 @@ func createOtelAuditEvent(logger *slog.Logger, statusCode int, req *http.Request
 func getCallerIdentities(req *http.Request) map[msgs.CallerIdentityType][]msgs.CallerIdentityEntry {
 	caller := make(map[msgs.CallerIdentityType][]msgs.CallerIdentityEntry)
 
-	// Context:
-	// Callers will setup their frontend routes like so:
-	// r.HandleFunc("/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}", handler)...
-
-	vars := mux.Vars(req)                    // Extract variables from the URL
-	subscriptionID := vars["subscriptionId"] // Get subscription ID from the URL
+	// Extract variables from the URL using gorilla/mux.
+	vars := mux.Vars(req)
+	subscriptionID := vars["subscriptionId"]
 
 	clientAppID := req.Header.Get("x-ms-client-app-id")
 	clientPrincipalName := req.Header.Get("x-ms-client-principal-name")
