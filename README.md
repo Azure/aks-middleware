@@ -181,7 +181,7 @@ This middleware is intended to be used by RPs that whose URLs follow the below p
 
 ```
 
-To use the `operationrequest` middleware, you need to create an instance of the middleware with the desired options and apply it to your router.
+To use the `operationrequest` middleware, you need to create an instance of the middleware with the desired options and apply it to your router. Ensure this middleware is only applied to routes that require the Operation Request struct to be created and injected into the context.
 
 ```go
 import (
