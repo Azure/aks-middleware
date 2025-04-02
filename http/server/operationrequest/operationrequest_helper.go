@@ -62,6 +62,10 @@ func NewBaseOperationRequest[T any](req *http.Request, region string, opts Opera
         return nil, errors.New("no api-version in URI's parameters")
     }
     op.TargetURI = req.URL.String()
+    op.HttpMethod = req.Method
+    if currRoute := mux.CurrentRoute(req); currRoute != nil {
+        op.RouteName = currRoute.GetName()
+    }
 
     headers := req.Header
     op.CorrelationID = headers.Get(common.RequestCorrelationIDHeader)
@@ -71,8 +75,7 @@ func NewBaseOperationRequest[T any](req *http.Request, region string, opts Opera
     } else {
         op.OperationID = uuid.Must(uuid.FromString(opID)).String()
     }
-    op.HttpMethod = req.Method
-
+    
     vars := mux.Vars(req)
     op.SubscriptionID = vars[common.SubscriptionIDKey]
     op.ResourceGroup = vars[common.ResourceGroupKey]
@@ -85,10 +88,6 @@ func NewBaseOperationRequest[T any](req *http.Request, region string, opts Opera
         return nil, fmt.Errorf("failed to read HTTP body: %w", err)
     }
     op.Body = body
-
-    if currRoute := mux.CurrentRoute(req); currRoute != nil {
-        op.RouteName = currRoute.GetName()
-    }
 
     if opts.Customizer != nil {
         if err := opts.Customizer(&op.Extras, headers, vars); err != nil {

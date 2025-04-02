@@ -177,7 +177,7 @@ This ensures that each request has a unique `OperationID`, either supplied by th
 
 This middleware is intended to be used by RPs that whose URLs follow the below pattern:
 ```go
-        routePattern := "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/{resourceProvider}/{resourceType}/{resourceName}/default"
+        routePattern := "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/{resourceProvider}/{resourceType}/{resourceName}/default?api-version=XXXX-XX-XX"
 
 ```
 

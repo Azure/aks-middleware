@@ -39,13 +39,13 @@ var _ = Describe("OperationRequest using MyExtras", func() {
 		// setup a router for matching URL variables
 		router = mux.NewRouter()
 		routePattern := "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/{resourceProvider}/{resourceType}/{resourceName}/default"
-		validURL = "/subscriptions/sub3/resourceGroups/rg3/providers/Microsoft.Test/providerType1/resourceName1/default?api-version=2021-12-01"
+		validURL = "/subscriptions/sub3/resourceGroups/rg3/providers/Microsoft.Test/resourceType1/resourceName1/default?api-version=2021-12-01"
 		router.HandleFunc(routePattern, func(w http.ResponseWriter, r *http.Request) {})
 	})
 
 	Describe("NewBaseOperationRequest", func() {
 		It("should return an error when api-version is missing", func() {
-			url := "/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.Test/providerType1/resourceName1/default"
+			url := "/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.Test/resourceType1/resourceName1/default"
 			req = httptest.NewRequest(http.MethodGet, url, nil)
 
 			routeMatch := &mux.RouteMatch{}
@@ -135,7 +135,7 @@ var _ = Describe("OperationRequest using MyExtras", func() {
 				Expect(op.APIVersion).To(Equal("2021-12-01"))
 				Expect(op.SubscriptionID).To(Equal("sub3"))
 				Expect(op.ResourceGroup).To(Equal("rg3"))
-				Expect(op.ResourceType).To(Equal("Microsoft.Test/providerType1"))
+				Expect(op.ResourceType).To(Equal("Microsoft.Test/resourceType1"))
 				Expect(op.ResourceName).To(Equal("resourceName1"))
 			})
 
