@@ -181,7 +181,9 @@ This middleware is intended to be used by RPs that whose URLs follow the below p
 
 ```
 
-To use the `operationrequest` middleware, you need to create an instance of the middleware with the desired options and apply it to your router. Ensure this middleware is only applied to routes that require the Operation Request struct to be created and injected into the context.
+To use the `operationrequest` middleware, you need to create an instance of the middleware with the desired options and apply it to your router. Ensure this middleware is only applied to routes that require the Operation Request struct to be created and injected into the context. The interceptor is only meant to be used for "operation related" paths, otherwise it will return an internal error if it deems the URL to be incomplete/invalid (i.e. missing api version).
+
+In an actual REST service, there can be multiple paths (i.e. health check). In this case, caller should create a subrouter to apply the middleware to certain paths only. Example included in integration test.
 
 ```go
 import (

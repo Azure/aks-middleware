@@ -54,6 +54,7 @@ func NewBaseOperationRequest[T any](req *http.Request, region string, opts Opera
         Request: req,
         Extras:  opts.Extras,
     }
+
     query := req.URL.Query()
     op.APIVersion = query.Get(common.APIVersionKey)
     // if the api-version is not present in the URL, return an error
@@ -62,6 +63,17 @@ func NewBaseOperationRequest[T any](req *http.Request, region string, opts Opera
         return nil, errors.New("no api-version in URI's parameters")
     }
     op.TargetURI = req.URL.String()
+    vars := mux.Vars(req)
+    op.SubscriptionID = vars[common.SubscriptionIDKey]
+    op.ResourceGroup = vars[common.ResourceGroupKey]
+    op.ResourceType = vars[common.ResourceProviderKey] + "/" + vars[common.ResourceTypeKey]
+    op.ResourceName = vars[common.ResourceNameKey]
+    op.Region = region
+    body, err := io.ReadAll(req.Body)
+    if err != nil {
+        return nil, fmt.Errorf("failed to read HTTP body: %w", err)
+    }
+    op.Body = body
     op.HttpMethod = req.Method
     if currRoute := mux.CurrentRoute(req); currRoute != nil {
         op.RouteName = currRoute.GetName()
@@ -76,19 +88,6 @@ func NewBaseOperationRequest[T any](req *http.Request, region string, opts Opera
         op.OperationID = uuid.Must(uuid.FromString(opID)).String()
     }
     
-    vars := mux.Vars(req)
-    op.SubscriptionID = vars[common.SubscriptionIDKey]
-    op.ResourceGroup = vars[common.ResourceGroupKey]
-    op.ResourceType = vars[common.ResourceProviderKey] + "/" + vars[common.ResourceTypeKey]
-    op.ResourceName = vars[common.ResourceNameKey]
-    op.Region = region
-
-    body, err := io.ReadAll(req.Body)
-    if err != nil {
-        return nil, fmt.Errorf("failed to read HTTP body: %w", err)
-    }
-    op.Body = body
-
     if opts.Customizer != nil {
         if err := opts.Customizer(&op.Extras, headers, vars); err != nil {
             return nil, err
