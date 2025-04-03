@@ -61,7 +61,7 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // NewMiddleware returns a middleware function to add OTEL audit logging.
-func NewMiddleware(logger *slog.Logger, otelConfig *OtelConfig) func(next http.Handler) http.Handler {
+func NewOtelAuditLogging(logger *slog.Logger, otelConfig *OtelConfig) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return &Middleware{
 			next:       next,
