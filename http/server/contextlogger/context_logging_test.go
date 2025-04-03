@@ -113,7 +113,7 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 		cfg.buf = new(bytes.Buffer)
 		cfg.logger = slog.New(slog.NewJSONHandler(cfg.buf, nil))
 
-		r.Use(NewLogging(*cfg.logger, cfg.source, cfg.attrMgr))
+		r.Use(NewLogging(*cfg.logger, cfg.source, &cfg.attrMgr))
 		r.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		})

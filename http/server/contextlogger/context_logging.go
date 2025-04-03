@@ -29,13 +29,17 @@ const (
 
 // If source is empty, it will be set to "CtxLog"
 // If a field in the attributeAssigner are empty, or the struct itself is empty, default functions will be set
-func NewLogging(logger slog.Logger, source string, attributeManager AttributeManager) mux.MiddlewareFunc {
+func NewLogging(logger slog.Logger, source string, attributeManager *AttributeManager) mux.MiddlewareFunc {
+	if attributeManager != nil || source == ctxLogSource {
+		setInitializerAndAssignerIfNil(attributeManager)
+	}
+
 	return func(next http.Handler) http.Handler {
 		return &customAttributeLoggingMiddleware{
 			next:             next,
 			logger:           logger,
 			source:           source,
-			attributeManager: &attributeManager,
+			attributeManager: attributeManager,
 		}
 	}
 }
@@ -78,12 +82,10 @@ func (l *customAttributeLoggingMiddleware) ServeHTTP(w http.ResponseWriter, r *h
 
 	addextraattributes := false
 	extraAttributes := make(map[string]interface{})
-
 	customWriter := &ResponseRecord{ResponseWriter: w}
 
 	if l.attributeManager != nil || l.source == ctxLogSource {
 		addextraattributes = true
-		setInitializerAndAssignerIfNil(l.attributeManager)
 		extraAttributes = l.attributeManager.AttributeInitializer(customWriter, r)
 	}
 
