@@ -16,7 +16,7 @@ type AttributeInitializerFunc func(w *ResponseRecord, r *http.Request) map[strin
 type AttributeAssignerFunc func(w *ResponseRecord, r *http.Request, attrs map[string]interface{}) map[string]interface{}
 
 type AttributeManager struct {
-	AttributeInitializer AttributeInitializerFunc // sets keys for custom attributes at the beginning of ServeHTTP()
+	AttributeInitializer AttributeInitializerFunc //TODO: remove initializer for context logger, use in custom logger
 	AttributeAssigner    AttributeAssignerFunc    // assigns values for custom attributes after request has completed
 }
 
@@ -26,6 +26,8 @@ const (
 	ctxLogSource               = "CtxLog"
 	ctxLoggerKey loggerKeyType = "CtxLogKey"
 )
+
+//TODO: separate ctx logging from custom loggging
 
 // If source is empty, it will be set to "CtxLog"
 // If a field in the attributeAssigner are empty, or the struct itself is empty, default functions will be set
@@ -77,28 +79,19 @@ func (r *ResponseRecord) StatusCode() int {
 
 func (l *customAttributeLoggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if len(l.source) == 0 {
-		l.source = ctxLogSource
+		l.source = ctxLogSource // TODO: remove this check if source is always CtxLog
 	}
 
 	addextraattributes := false
 	extraAttributes := make(map[string]interface{})
 	customWriter := &ResponseRecord{ResponseWriter: w}
 
-	if l.attributeManager != nil || l.source == ctxLogSource {
+	if l.attributeManager != nil || l.source == ctxLogSource { //TODO: get rid of second check if separating ctx logger and custom logger
 		addextraattributes = true
 		extraAttributes = l.attributeManager.AttributeInitializer(customWriter, r)
 	}
 
 	ctx := r.Context()
-
-	defer func() {
-		if err := recover(); err != nil {
-			ctx = context.WithValue(ctx, "panic", err)
-			r = r.WithContext(ctx)
-		}
-	}()
-
-	l.next.ServeHTTP(customWriter, r.WithContext(ctx))
 
 	var updatedAttrs map[string]interface{}
 	if addextraattributes {
@@ -111,6 +104,8 @@ func (l *customAttributeLoggingMiddleware) ServeHTTP(w http.ResponseWriter, r *h
 	contextLogger := l.logger.With(attributes...)
 	ctx = context.WithValue(ctx, ctxLoggerKey, contextLogger)
 	r = r.WithContext(ctx)
+
+	l.next.ServeHTTP(customWriter, r.WithContext(ctx))
 }
 
 func BuildAttributes(ctx context.Context, source string, r *http.Request, extra map[string]interface{}) []interface{} {
@@ -126,13 +121,9 @@ func BuildAttributes(ctx context.Context, source string, r *http.Request, extra 
 	}
 
 	var attributes []interface{}
-	if source == ctxLogSource { // do not flatten attributes, they will be added to "log" column
+	if source == ctxLogSource { // TODO: remove this check, CtxLog should be the only source
 		attributes = defaultCtxLogAttributes(r)
 		attributes = append(attributes, "log", extra)
-	} else {
-		flattened := flattenAttributes(extra)
-		attributes = append(attributes, "source", source)
-		attributes = append(attributes, flattened...)
 	}
 
 	attributes = append(attributes, "headers", headers)
