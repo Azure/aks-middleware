@@ -20,8 +20,11 @@ type AttributeManager struct {
 	AttributeAssigner    AttributeAssignerFunc    // assigns values for custom attributes after request has completed
 }
 
+type loggerKeyType string
+
 const (
-	ctxLogSource = "CtxLog"
+	ctxLogSource               = "CtxLog"
+	ctxLoggerKey loggerKeyType = "CtxLogKey"
 )
 
 // If source is empty, it will be set to "CtxLog"
@@ -30,7 +33,6 @@ func NewLogging(logger slog.Logger, source string, attributeManager AttributeMan
 	return func(next http.Handler) http.Handler {
 		return &customAttributeLoggingMiddleware{
 			next:             next,
-			now:              time.Time{},
 			logger:           logger,
 			source:           source,
 			attributeManager: &attributeManager,
@@ -43,7 +45,6 @@ var _ http.Handler = &customAttributeLoggingMiddleware{}
 
 type customAttributeLoggingMiddleware struct {
 	next             http.Handler
-	now              time.Time
 	logger           slog.Logger
 	source           string
 	attributeManager *AttributeManager
@@ -86,10 +87,8 @@ func (l *customAttributeLoggingMiddleware) ServeHTTP(w http.ResponseWriter, r *h
 		extraAttributes = l.attributeManager.AttributeInitializer(customWriter, r)
 	}
 
-	startTime := time.Now()
+	//startTime := time.Now()
 	ctx := r.Context()
-
-	l.LogRequestStart(ctx, r, "RequestStart", extraAttributes)
 
 	defer func() {
 		if err := recover(); err != nil {
@@ -99,9 +98,6 @@ func (l *customAttributeLoggingMiddleware) ServeHTTP(w http.ResponseWriter, r *h
 	}()
 
 	l.next.ServeHTTP(customWriter, r.WithContext(ctx))
-	endTime := time.Now()
-
-	latency := endTime.Sub(startTime)
 
 	var updatedAttrs map[string]interface{}
 	if addextraattributes {
@@ -110,11 +106,10 @@ func (l *customAttributeLoggingMiddleware) ServeHTTP(w http.ResponseWriter, r *h
 		updatedAttrs = extraAttributes
 	}
 
-	updatedAttrs["code"] = customWriter.statusCode
-	updatedAttrs["time_ms"] = latency.Milliseconds()
-
-	l.LogRequestEnd(ctx, r, "RequestEnd", updatedAttrs)
-	l.LogRequestEnd(ctx, r, "finished call", updatedAttrs)
+	attributes := BuildAttributes(ctx, l.source, r, updatedAttrs)
+	contextLogger := l.logger.With(attributes...)
+	ctx = context.WithValue(ctx, ctxLoggerKey, contextLogger)
+	r = r.WithContext(ctx)
 }
 
 func BuildAttributes(ctx context.Context, source string, r *http.Request, extra map[string]interface{}) []interface{} {
@@ -141,16 +136,6 @@ func BuildAttributes(ctx context.Context, source string, r *http.Request, extra 
 
 	attributes = append(attributes, "headers", headers)
 	return attributes
-}
-
-func (l *customAttributeLoggingMiddleware) LogRequestStart(ctx context.Context, r *http.Request, msg string, extraAttributes map[string]interface{}) {
-	attributes := BuildAttributes(ctx, l.source, r, extraAttributes)
-	l.logger.InfoContext(ctx, msg, attributes...)
-}
-
-func (l *customAttributeLoggingMiddleware) LogRequestEnd(ctx context.Context, r *http.Request, msg string, extraAttributes map[string]interface{}) {
-	attributes := BuildAttributes(ctx, l.source, r, extraAttributes)
-	l.logger.InfoContext(ctx, msg, attributes...)
 }
 
 // Sets the initializer and/or assigner to a default function if nil
