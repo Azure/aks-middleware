@@ -87,7 +87,6 @@ func (l *customAttributeLoggingMiddleware) ServeHTTP(w http.ResponseWriter, r *h
 		extraAttributes = l.attributeManager.AttributeInitializer(customWriter, r)
 	}
 
-	//startTime := time.Now()
 	ctx := r.Context()
 
 	defer func() {
