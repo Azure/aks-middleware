@@ -2,7 +2,6 @@ package contextlogger
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -31,7 +30,7 @@ func NewLogging(logger slog.Logger, source string, attributeManager AttributeMan
 	return func(next http.Handler) http.Handler {
 		return &customAttributeLoggingMiddleware{
 			next:             next,
-			now:              time.Now,
+			now:              time.Time{},
 			logger:           logger,
 			source:           source,
 			attributeManager: &attributeManager,
@@ -44,7 +43,7 @@ var _ http.Handler = &customAttributeLoggingMiddleware{}
 
 type customAttributeLoggingMiddleware struct {
 	next             http.Handler
-	now              func() time.Time
+	now              time.Time
 	logger           slog.Logger
 	source           string
 	attributeManager *AttributeManager
@@ -72,7 +71,6 @@ func (r *ResponseRecord) StatusCode() int {
 }
 
 func (l *customAttributeLoggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("source: ", l.source)
 	if len(l.source) == 0 {
 		l.source = ctxLogSource
 	}
@@ -85,10 +83,10 @@ func (l *customAttributeLoggingMiddleware) ServeHTTP(w http.ResponseWriter, r *h
 	if l.attributeManager != nil || l.source == ctxLogSource {
 		addextraattributes = true
 		setInitializerAndAssignerIfNil(l.attributeManager)
-		extraAttributes = (l.attributeManager.AttributeInitializer)(customWriter, r)
+		extraAttributes = l.attributeManager.AttributeInitializer(customWriter, r)
 	}
 
-	startTime := l.now()
+	startTime := time.Now()
 	ctx := r.Context()
 
 	l.LogRequestStart(ctx, r, "RequestStart", extraAttributes)
@@ -101,7 +99,7 @@ func (l *customAttributeLoggingMiddleware) ServeHTTP(w http.ResponseWriter, r *h
 	}()
 
 	l.next.ServeHTTP(customWriter, r.WithContext(ctx))
-	endTime := l.now()
+	endTime := time.Now()
 
 	latency := endTime.Sub(startTime)
 

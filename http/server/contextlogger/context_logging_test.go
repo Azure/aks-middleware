@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"time"
 
 	"github.com/Azure/aks-middleware/http/server/requestid"
 	"github.com/gorilla/mux"
@@ -116,7 +115,6 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 
 		r.Use(NewLogging(*cfg.logger, cfg.source, cfg.attrMgr))
 		r.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			time.Sleep(10 * time.Millisecond)
 			w.WriteHeader(http.StatusOK)
 		})
 		return r
