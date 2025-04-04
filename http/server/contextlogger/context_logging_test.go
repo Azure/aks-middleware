@@ -2,7 +2,6 @@ package contextlogger
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -14,12 +13,11 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-// Configuration for test routers
+// routerConfig now only holds the extraAttributes map (source is not customizable).
 type routerConfig struct {
-	buf     *bytes.Buffer
-	logger  *slog.Logger
-	source  string
-	attrMgr AttributeManager
+	buf             *bytes.Buffer
+	logger          *slog.Logger
+	extraAttributes map[string]interface{}
 }
 
 const (
@@ -28,11 +26,10 @@ const (
 	resultTypeKey        = "resultType"
 	errorDetailsKey      = "errorDetails"
 
-	defaultRouterName                           = "default"
-	onlyInitializerRouterName                   = "only-initializer-set"
-	onlyAssignerRouterName                      = "only-assigner-set"
-	extraLoggingVariablesRouterNameCustomSource = "extra-logging-variables-provided-custom-source"
-	extraLoggingVariablesRouterNameCtxLogSource = "extra-logging-variables-provided-CtxLog-source"
+	defaultRouterName         = "default"
+	onlyAssignerRouterName    = "only-assigner-set"
+	onlyInitializerRouterName = "only-initializer-set"
+	extraLoggingVariablesName = "extra-logging-variables"
 
 	customTestKey   = "testKey"
 	customTestValue = "testValue"
@@ -40,6 +37,7 @@ const (
 
 var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 	var (
+		// customExtractor remains the same.
 		customExtractor = func(r *http.Request) map[string]string {
 			return map[string]string{
 				string(requestid.CorrelationIDKey): r.Header.Get(requestid.RequestCorrelationIDHeader),
@@ -47,65 +45,37 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 			}
 		}
 
-		extraAttributesInitializer = func(w *ResponseRecord, r *http.Request) map[string]interface{} {
-			return map[string]interface{}{
-				"subscriptionID":    "defaultSubIDvalue",
-				"resourceGroupName": "defaultRGnamevalue",
-				"resultType":        "defaultResultTypevalue",
-				"errorDetails":      "defaultErrorDetailsvalue",
-			}
+		// router configurations supply a simple extraAttributes map.
+		testRoutersConfigurationMap = map[string]*routerConfig{
+			defaultRouterName: {
+				extraAttributes: nil,
+			},
+			onlyAssignerRouterName: {
+				extraAttributes: map[string]interface{}{
+					customTestKey: customTestValue,
+				},
+			},
+			onlyInitializerRouterName: {
+				extraAttributes: map[string]interface{}{
+					customTestKey: customTestValue,
+				},
+			},
+			extraLoggingVariablesName: {
+				extraAttributes: map[string]interface{}{
+					subscriptionIDKey:    "defaultSubIDvalue",
+					resourceGroupNameKey: "defaultRGnamevalue",
+					resultTypeKey:        2,
+					errorDetailsKey:      "defaultErrorDetailsvalue",
+				},
+			},
 		}
 
-		extraAttributesAssigner = func(w *ResponseRecord, r *http.Request, attrMap map[string]interface{}) map[string]interface{} {
-			opReq := operationRequestFromContext(r.Context())
-			if opReq != nil {
-				attrMap["resourceGroupName"] = opReq.ResourceGroupName
-				attrMap["subscriptionID"] = opReq.SubscriptionID
-			}
-			attrMap["resultType"] = 2
-			return attrMap
-		}
+		routersMap = map[string]*mux.Router{}
 	)
 
-	testRoutersConfigurationMap := map[string]*routerConfig{
-		defaultRouterName: {
-			source:  ctxLogSource,
-			attrMgr: AttributeManager{},
-		},
-		onlyAssignerRouterName: {
-			source: ctxLogSource,
-			// only assigner provided
-			attrMgr: AttributeManager{
-				AttributeAssigner: func(w *ResponseRecord, r *http.Request, attrs map[string]interface{}) map[string]interface{} {
-					return map[string]interface{}{customTestKey: customTestValue}
-				},
-			},
-		},
-		onlyInitializerRouterName: {
-			source: ctxLogSource,
-			// only initializer provided
-			attrMgr: AttributeManager{
-				AttributeInitializer: func(w *ResponseRecord, r *http.Request) map[string]interface{} {
-					return map[string]interface{}{customTestKey: customTestValue}
-				},
-			},
-		},
-		extraLoggingVariablesRouterNameCustomSource: {
-			source: "customSource",
-			attrMgr: AttributeManager{
-				AttributeInitializer: extraAttributesInitializer,
-				AttributeAssigner:    extraAttributesAssigner,
-			},
-		},
-		extraLoggingVariablesRouterNameCtxLogSource: {
-			source: ctxLogSource,
-			attrMgr: AttributeManager{
-				AttributeInitializer: extraAttributesInitializer,
-				AttributeAssigner:    extraAttributesAssigner,
-			},
-		},
-	}
-
+	// buildRouter creates a mux.Router, installs the requestid middleware,
+	// the context logging middleware (using NewLogging without source customization),
+	// and a test handler that retrieves the logger via GetLogger and logs a message.
 	buildRouter := func(cfg *routerConfig) *mux.Router {
 		r := mux.NewRouter()
 		r.Use(requestid.NewRequestIDMiddlewareWithExtractor(customExtractor))
@@ -113,14 +83,16 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 		cfg.buf = new(bytes.Buffer)
 		cfg.logger = slog.New(slog.NewJSONHandler(cfg.buf, nil))
 
-		r.Use(NewLogging(*cfg.logger, cfg.source, &cfg.attrMgr))
+		// Now call NewLogging with only the logger and extraAttributes.
+		r.Use(NewLogging(*cfg.logger, cfg.extraAttributes))
 		r.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			if l := GetLogger(r.Context()); l != nil {
+				l.Info("test log message")
+			}
 			w.WriteHeader(http.StatusOK)
 		})
 		return r
 	}
-
-	routersMap := map[string]*mux.Router{}
 
 	BeforeAll(func() {
 		for name, cfg := range testRoutersConfigurationMap {
@@ -128,7 +100,7 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 		}
 	})
 
-	It("should log and return OK status", func() {
+	It("should inject a context logger and log a test message", func() {
 		w := httptest.NewRecorder()
 		req := httptest.NewRequest("GET", "/", nil)
 		req.Header.Set(requestid.RequestARMClientRequestIDHeader, "test-request-id")
@@ -136,16 +108,15 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 		routersMap[defaultRouterName].ServeHTTP(w, req)
 
 		cfg := testRoutersConfigurationMap[defaultRouterName]
-		buf := cfg.buf
-		fmt.Println("buf string")
-		fmt.Println(buf.String())
-
-		Expect(buf).To(ContainSubstring("finished call"))
-		Expect(buf).To(ContainSubstring(`"source":"CtxLog"`))
-		Expect(buf).To(ContainSubstring(`"time":`))
-		Expect(buf).To(ContainSubstring(`"level":"INFO"`))
-		Expect(buf).To(ContainSubstring(`"%s":"%s"`, "request_id", "test-request-id"))
-		Expect(buf).To(ContainSubstring(`"method":"GET"`))
+		out := cfg.buf.String()
+		fmt.Println("Output from default router:")
+		fmt.Println(out)
+		// Expect default fields (source always "CtxLog" now).
+		Expect(out).To(ContainSubstring(`"source":"CtxLog"`))
+		Expect(out).To(ContainSubstring(`"time":`))
+		Expect(out).To(ContainSubstring(`"level":"INFO"`))
+		// Verify the test log message.
+		Expect(out).To(ContainSubstring("test log message"))
 		Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
 	})
 
@@ -158,163 +129,56 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 		routersMap[defaultRouterName].ServeHTTP(w, req)
 
 		cfg := testRoutersConfigurationMap[defaultRouterName]
-		buf := cfg.buf
-		Expect(buf.String()).To(ContainSubstring(`"operationid":"test-operation-id"`))
-		Expect(buf.String()).To(ContainSubstring(`"correlationid":"test-correlation-id"`))
-		Expect(buf.String()).ToNot(ContainSubstring(`"armclientrequestid"`))
+		out := cfg.buf.String()
+		Expect(out).To(ContainSubstring(`"operationid":"test-operation-id"`))
+		Expect(out).To(ContainSubstring(`"correlationid":"test-correlation-id"`))
+		Expect(out).ToNot(ContainSubstring(`"armclientrequestid"`))
 		Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
 	})
 
-	It("If either AttributeManager initializer or assigner is nil, default attributes should be set", func() {
+	It("should include custom attributes provided in the extraAttributes map", func() {
+		// Test for routers configured with fixed extra attributes.
 		w := httptest.NewRecorder()
 		req := httptest.NewRequest("GET", "/", nil)
+		req.Header.Set(requestid.RequestAcsOperationIDHeader, "test-op-id")
+		req.Header.Set(requestid.RequestCorrelationIDHeader, "test-corr-id")
 
-		routerWithoutInitializer := routersMap[onlyAssignerRouterName]
-		routerWithoutInitializer.ServeHTTP(w, req)
+		routersMap[onlyAssignerRouterName].ServeHTTP(w, req)
 		cfg := testRoutersConfigurationMap[onlyAssignerRouterName]
-		buf3 := cfg.buf
+		out := cfg.buf.String()
+		Expect(out).To(ContainSubstring(fmt.Sprintf(`"%s":"%s"`, customTestKey, customTestValue)))
+		Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
 
-		// assigner was set by user without initializer, but assigner should not be overwritten
-		Expect(buf3.String()).To(ContainSubstring(`"%s":"%s"`, customTestKey, customTestValue))
-
+		// Also test the onlyInitializer configuration.
 		w2 := httptest.NewRecorder()
 		req2 := httptest.NewRequest("GET", "/", nil)
-		routerWithoutAssigner := routersMap[onlyInitializerRouterName]
-		routerWithoutAssigner.ServeHTTP(w2, req2)
-		cfg4 := testRoutersConfigurationMap[onlyInitializerRouterName]
-		buf4 := cfg4.buf
-
-		// initializer was set by user without assigner, but initializer should not be overwritten
-		Expect(buf4.String()).To(ContainSubstring(`"%s":"%s"`, customTestKey, customTestValue))
-
-		routerWithoutAssigner.ServeHTTP(w, req)
+		routersMap[onlyInitializerRouterName].ServeHTTP(w2, req2)
+		cfg2 := testRoutersConfigurationMap[onlyInitializerRouterName]
+		out2 := cfg2.buf.String()
+		Expect(out2).To(ContainSubstring(fmt.Sprintf(`"%s":"%s"`, customTestKey, customTestValue)))
+		Expect(w2.Result().StatusCode).To(Equal(http.StatusOK))
 	})
 
-	// Tests the primary difference between customAttributeLoggingMiddleware and loggingMiddleware
-	// resourceGroupName, subscriptionID errorDetails, and resultType should be set in addition to pre-set headers
-	It("Source is NOT CtxLog, should set values for extra attributes included for logging", func() {
-		w := httptest.NewRecorder()
-		req := httptest.NewRequest("GET", "/", nil)
-		req.Header.Set(requestid.RequestAcsOperationIDHeader, "test-operation-id")
-		req.Header.Set(requestid.RequestCorrelationIDHeader, "test-correlation-id")
-
-		opReq := &OperationRequest{
-			ResourceGroupName: "test-rgname-value",
-			SubscriptionID:    "test-subid-value",
-		}
-
-		ctx := context.WithValue(context.Background(), operationRequestKey, opReq)
-
-		req = req.WithContext(ctx)
-		routersMap[extraLoggingVariablesRouterNameCustomSource].ServeHTTP(w, req)
-		cfg := testRoutersConfigurationMap[extraLoggingVariablesRouterNameCustomSource]
-		buf2 := cfg.buf
-		Expect(buf2.String()).To(ContainSubstring(`"operationid":"test-operation-id"`))
-		Expect(buf2.String()).To(ContainSubstring(`"correlationid":"test-correlation-id"`))
-		Expect(buf2.String()).ToNot(ContainSubstring(`"armclientrequestid"`))
-
-		// check extra attributes
-		Expect(buf2.String()).To(ContainSubstring(`"%s":"%s"`, resourceGroupNameKey, "test-rgname-value"))
-		Expect(buf2.String()).To(ContainSubstring(`"%s":"%s"`, subscriptionIDKey, "test-subid-value"))
-		Expect(buf2.String()).To(ContainSubstring(`"%s":"%s"`, errorDetailsKey, "defaultErrorDetailsvalue"))
-		Expect(buf2.String()).To(ContainSubstring(`"%s":%d`, resultTypeKey, 2))
-		Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
-	})
-
-	It("Source is Ctxlog, default and extra attributes are included for logging", func() {
+	It("should include default and extra attributes in logging for extra variables", func() {
 		w := httptest.NewRecorder()
 		req := httptest.NewRequest("GET", "/", nil)
 		req.Header.Set(requestid.RequestAcsOperationIDHeader, "test-operation-id")
 		req.Header.Set(requestid.RequestCorrelationIDHeader, "test-correlation-id")
 		req.Header.Set(requestid.RequestARMClientRequestIDHeader, "test-request-id")
 
-		opReq := &OperationRequest{
-			ResourceGroupName: "test-rgname-value",
-			SubscriptionID:    "test-subid-value",
-		}
-
-		ctx := context.WithValue(context.Background(), operationRequestKey, opReq)
-
-		req = req.WithContext(ctx)
-		cfg := testRoutersConfigurationMap[extraLoggingVariablesRouterNameCtxLogSource]
-		cfg.source = ctxLogSource
-		routersMap[extraLoggingVariablesRouterNameCtxLogSource].ServeHTTP(w, req)
-
-		buf2 := cfg.buf
-		Expect(buf2.String()).To(ContainSubstring(`"operationid":"test-operation-id"`))
-		Expect(buf2.String()).To(ContainSubstring(`"correlationid":"test-correlation-id"`))
-		Expect(buf2.String()).ToNot(ContainSubstring(`"armclientrequestid"`))
-
-		// check default attributes
-		Expect(buf2.String()).To(ContainSubstring("finished call"))
-		Expect(buf2.String()).To(ContainSubstring(`"source":"CtxLog"`))
-		Expect(buf2.String()).To(ContainSubstring(`"time":`))
-		Expect(buf2.String()).To(ContainSubstring(`"level":"INFO"`))
-		Expect(buf2.String()).To(ContainSubstring(`"%s":"%s"`, "request_id", "test-request-id"))
-		Expect(buf2.String()).To(ContainSubstring(`"method":"GET"`))
-
-		// check extra attributes
-		Expect(buf2.String()).To(ContainSubstring(`"%s":"%s"`, resourceGroupNameKey, "test-rgname-value"))
-		Expect(buf2.String()).To(ContainSubstring(`"%s":"%s"`, subscriptionIDKey, "test-subid-value"))
-		Expect(buf2.String()).To(ContainSubstring(`"%s":"%s"`, errorDetailsKey, "defaultErrorDetailsvalue"))
-		Expect(buf2.String()).To(ContainSubstring(`"%s":%d`, resultTypeKey, 2))
+		routersMap[extraLoggingVariablesName].ServeHTTP(w, req)
+		cfg := testRoutersConfigurationMap[extraLoggingVariablesName]
+		out := cfg.buf.String()
+		Expect(out).To(ContainSubstring(`"source":"CtxLog"`))
+		Expect(out).To(ContainSubstring(`"time":`))
+		Expect(out).To(ContainSubstring(`"level":"INFO"`))
+		Expect(out).To(ContainSubstring(fmt.Sprintf(`"request_id":"%s"`, "test-request-id")))
+		Expect(out).To(ContainSubstring(`"method":"GET"`))
+		// Verify extra attributes appear.
+		Expect(out).To(ContainSubstring(fmt.Sprintf(`"%s":"%s"`, resourceGroupNameKey, "defaultRGnamevalue")))
+		Expect(out).To(ContainSubstring(fmt.Sprintf(`"%s":"%s"`, subscriptionIDKey, "defaultSubIDvalue")))
+		Expect(out).To(ContainSubstring(fmt.Sprintf(`"%s":"%s"`, errorDetailsKey, "defaultErrorDetailsvalue")))
+		Expect(out).To(ContainSubstring(fmt.Sprintf(`"%s":%d`, resultTypeKey, 2)))
 		Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
 	})
 })
-
-var _ = Describe("Test Helpers", func() {
-	It("Test setInitializerAndAssignerIfNil()", func() {
-		attrMgr := &AttributeManager{}
-		setInitializerAndAssignerIfNil(attrMgr)
-		Expect(attrMgr.AttributeAssigner).ToNot(BeNil())
-		Expect(attrMgr.AttributeInitializer).ToNot(BeNil())
-		w := &ResponseRecord{}
-		req := httptest.NewRequest("GET", "/", nil)
-		initMap := attrMgr.AttributeInitializer(w, req)
-		Expect(initMap).To(BeEmpty())
-		finalMap := attrMgr.AttributeAssigner(w, req, initMap)
-		Expect(finalMap).To(BeEmpty())
-	})
-
-	It("Test flattenAttributes()", func() {
-		attrMap := map[string]interface{}{
-			customTestKey: customTestValue,
-			"latency":     2,
-		}
-
-		attrList := flattenAttributes(attrMap)
-		Expect(len(attrList)).To(Equal(4))
-
-		for i, val := range attrList {
-			if val == customTestKey {
-				Expect(attrList[i+1]).To(Equal(customTestValue))
-			}
-			if val == "latency" {
-				Expect(attrList[i+1]).To(Equal(2))
-			}
-		}
-	})
-})
-
-// Used only for testing
-type OperationRequest struct {
-	ResourceGroupName string
-	SubscriptionID    string
-}
-
-type contextKey struct{}
-
-var operationRequestKey = contextKey{}
-
-func operationRequestFromContext(ctx context.Context) *OperationRequest {
-	r, ok := ctx.Value(operationRequestKey).(*OperationRequest)
-	if !ok || r == nil {
-		return nil
-	}
-	return r.copy()
-}
-
-func (op *OperationRequest) copy() *OperationRequest {
-	r := *op
-	return &r
-}

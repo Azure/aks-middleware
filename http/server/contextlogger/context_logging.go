@@ -12,14 +12,6 @@ import (
 	"github.com/Azure/aks-middleware/http/common"
 )
 
-type AttributeInitializerFunc func(w *ResponseRecord, r *http.Request) map[string]interface{}
-type AttributeAssignerFunc func(w *ResponseRecord, r *http.Request, attrs map[string]interface{}) map[string]interface{}
-
-type AttributeManager struct {
-	AttributeInitializer AttributeInitializerFunc //TODO: remove initializer for context logger, use in custom logger
-	AttributeAssigner    AttributeAssignerFunc    // assigns values for custom attributes after request has completed
-}
-
 type loggerKeyType string
 
 const (
@@ -27,33 +19,26 @@ const (
 	ctxLoggerKey loggerKeyType = "CtxLogKey"
 )
 
-//TODO: separate ctx logging from custom loggging
-
-// If source is empty, it will be set to "CtxLog"
-// If a field in the attributeAssigner are empty, or the struct itself is empty, default functions will be set
-func NewLogging(logger slog.Logger, source string, attributeManager *AttributeManager) mux.MiddlewareFunc {
-	if attributeManager != nil || source == ctxLogSource {
-		setInitializerAndAssignerIfNil(attributeManager)
-	}
-
+// NewLogging creates a context logging middleware.
+// The caller can supply a map of custom attributes in extraAttributes,
+// which will be merged with the default attributes.
+func NewLogging(logger slog.Logger, extraAttributes map[string]interface{}) mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return &customAttributeLoggingMiddleware{
-			next:             next,
-			logger:           logger,
-			source:           source,
-			attributeManager: attributeManager,
+			next:            next,
+			logger:          logger,
+			extraAttributes: extraAttributes,
 		}
 	}
 }
 
-// Enforcing that loggingMiddleware implements the http.Handler interface to ensure safety at compile time
+// Enforce that customAttributeLoggingMiddleware implements http.Handler.
 var _ http.Handler = &customAttributeLoggingMiddleware{}
 
 type customAttributeLoggingMiddleware struct {
-	next             http.Handler
-	logger           slog.Logger
-	source           string
-	attributeManager *AttributeManager
+	next            http.Handler
+	logger          slog.Logger
+	extraAttributes map[string]interface{}
 }
 
 type ResponseRecord struct {
@@ -77,40 +62,22 @@ func (r *ResponseRecord) StatusCode() int {
 	return r.statusCode
 }
 
-func (l *customAttributeLoggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if len(l.source) == 0 {
-		l.source = ctxLogSource // TODO: remove this check if source is always CtxLog
-	}
+func (m *customAttributeLoggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
-	addextraattributes := false
-	extraAttributes := make(map[string]interface{})
 	customWriter := &ResponseRecord{ResponseWriter: w}
 
-	if l.attributeManager != nil || l.source == ctxLogSource { //TODO: get rid of second check if separating ctx logger and custom logger
-		addextraattributes = true
-		extraAttributes = l.attributeManager.AttributeInitializer(customWriter, r)
-	}
-
 	ctx := r.Context()
-
-	var updatedAttrs map[string]interface{}
-	if addextraattributes {
-		updatedAttrs = (l.attributeManager.AttributeAssigner)(customWriter, r, extraAttributes)
-	} else {
-		updatedAttrs = extraAttributes
-	}
-
-	attributes := BuildAttributes(ctx, l.source, r, updatedAttrs)
-	contextLogger := l.logger.With(attributes...)
+	attributes := BuildAttributes(ctx, r, m.extraAttributes)
+	contextLogger := m.logger.With(attributes...)
 	ctx = context.WithValue(ctx, ctxLoggerKey, contextLogger)
 	r = r.WithContext(ctx)
 
-	l.next.ServeHTTP(customWriter, r.WithContext(ctx))
+	m.next.ServeHTTP(customWriter, r)
 }
 
-func BuildAttributes(ctx context.Context, source string, r *http.Request, extra map[string]interface{}) []interface{} {
+// BuildAttributes creates a slice of key/value pairs used for logging.
+func BuildAttributes(ctx context.Context, r *http.Request, extra map[string]interface{}) []interface{} {
 	md, ok := metadata.FromIncomingContext(ctx)
-
 	headers := make(map[string]string)
 	if ok {
 		for key, values := range md {
@@ -120,9 +87,8 @@ func BuildAttributes(ctx context.Context, source string, r *http.Request, extra 
 		}
 	}
 
-	var attributes []interface{}
-	if source == ctxLogSource { // TODO: remove this check, CtxLog should be the only source
-		attributes = defaultCtxLogAttributes(r)
+	attributes := defaultCtxLogAttributes(r)
+	if extra != nil {
 		attributes = append(attributes, "log", extra)
 	}
 
@@ -130,57 +96,31 @@ func BuildAttributes(ctx context.Context, source string, r *http.Request, extra 
 	return attributes
 }
 
-// Sets the initializer and/or assigner to a default function if nil
-func setInitializerAndAssignerIfNil(attrManager *AttributeManager) {
-	if attrManager.AttributeInitializer == nil {
-		attrManager.AttributeInitializer = NewAttributeInitializer()
-	}
-
-	if attrManager.AttributeAssigner == nil {
-		attrManager.AttributeAssigner = NewAttributeAssigner()
-	}
-}
-
-// Returns default attribute initializer
-func NewAttributeInitializer() AttributeInitializerFunc {
-	return func(w *ResponseRecord, r *http.Request) map[string]interface{} {
-		return make(map[string]interface{})
-	}
-}
-
-// Returns default attribute assigner
-func NewAttributeAssigner() AttributeAssignerFunc {
-	return func(w *ResponseRecord, r *http.Request, attrs map[string]interface{}) map[string]interface{} {
-		return make(map[string]interface{}) // returning empty map because BuildAttributes sets default attributes regardless of default or user-defined assigner
-	}
-}
-
-// Adds map k:v pairs as separate entires in []interface{} list for logging
-func flattenAttributes(m map[string]interface{}) []interface{} {
-	attrList := make([]interface{}, 0, len(m)*2)
-	for key, value := range m {
-		attrList = append(attrList, key, value)
-	}
-
-	return attrList
-}
-
 func defaultCtxLogAttributes(r *http.Request) []interface{} {
 	var level slog.Level
-	var request string
+	requestPath := r.URL.Path
 	if r.Context().Err() != nil {
 		level = slog.LevelError
 	} else {
 		level = slog.LevelInfo
-		request = r.URL.Path
 	}
 
 	return []interface{}{
-		"source", ctxLogSource,
 		"time", time.Now(),
 		"level", level,
 		"request_id", r.Header.Get(common.RequestARMClientRequestIDHeader),
-		"request", request,
+		"request", requestPath,
 		"method", r.Method,
+		"source", ctxLogSource,
 	}
+}
+
+// GetLogger returns the logger stored in the context.
+// It will return nil if no logger was injected.
+func GetLogger(ctx context.Context) *slog.Logger {
+	logger, ok := ctx.Value(ctxLoggerKey).(*slog.Logger)
+	if !ok {
+		return nil
+	}
+	return logger
 }
