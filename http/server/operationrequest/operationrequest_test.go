@@ -14,24 +14,20 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-type MyExtras struct {
-	MyCustomHeader string
-}
-
-var _ = Describe("OperationRequest using MyExtras", func() {
+var _ = Describe("OperationRequest", func() {
 	var (
 		req      *http.Request
 		router   *mux.Router
 		validURL string
 	)
 
-	// no-op customizer for MyExtras
-	noOpCustomizer := OperationRequestCustomizerFunc[MyExtras](func(extras *MyExtras, headers http.Header, vars map[string]string) error {
+	// no-op customizer for map[string]interface{}
+	noOpCustomizer := OperationRequestCustomizerFunc(func(extras map[string]interface{}, headers http.Header, vars map[string]string) error {
 		return nil
 	})
 
-	defaultOpts := OperationRequestOptions[MyExtras]{
-		Extras:     MyExtras{},
+	defaultOpts := OperationRequestOptions{
+		Extras:     make(map[string]interface{}),
 		Customizer: noOpCustomizer,
 	}
 
@@ -111,17 +107,17 @@ var _ = Describe("OperationRequest using MyExtras", func() {
 				Expect(router.Match(req, routeMatch)).To(BeTrue())
 				req = mux.SetURLVars(req, routeMatch.Vars)
 
-				customizer := OperationRequestCustomizerFunc[MyExtras](func(extras *MyExtras, headers http.Header, vars map[string]string) error {
+				customizer := OperationRequestCustomizerFunc(func(extras map[string]interface{}, headers http.Header, vars map[string]string) error {
 					if customHeader := headers.Get("X-My-Custom-Header"); customHeader != "" {
-						extras.MyCustomHeader = customHeader
+						extras["MyCustomHeader"] = customHeader
 					}
 					// Attempt to modify extracted URI vars (this change should not persist in BaseOperationRequest)
 					vars[common.SubscriptionIDKey] = "modified-subscription"
 					return nil
 				})
 
-				opts := OperationRequestOptions[MyExtras]{
-					Extras:     MyExtras{},
+				opts := OperationRequestOptions{
+					Extras:     make(map[string]interface{}),
 					Customizer: customizer,
 				}
 
@@ -129,7 +125,7 @@ var _ = Describe("OperationRequest using MyExtras", func() {
 				Expect(err).NotTo(HaveOccurred())
 				Expect(op).NotTo(BeNil())
 				// Verify that custom field is added.
-				Expect(op.Extras.MyCustomHeader).To(Equal("header-value"))
+				Expect(op.Extras["MyCustomHeader"]).To(Equal("header-value"))
 
 				// Verify extracted fields remain unchanged.
 				Expect(op.APIVersion).To(Equal("2021-12-01"))
@@ -147,12 +143,12 @@ var _ = Describe("OperationRequest using MyExtras", func() {
 				req = mux.SetURLVars(req, routeMatch.Vars)
 
 				customErr := errors.New("custom error")
-				customizer := OperationRequestCustomizerFunc[MyExtras](func(extras *MyExtras, headers http.Header, vars map[string]string) error {
+				customizer := OperationRequestCustomizerFunc(func(extras map[string]interface{}, headers http.Header, vars map[string]string) error {
 					return customErr
 				})
 
-				opts := OperationRequestOptions[MyExtras]{
-					Extras:     MyExtras{},
+				opts := OperationRequestOptions{
+					Extras:     make(map[string]interface{}),
 					Customizer: customizer,
 				}
 

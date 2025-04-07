@@ -84,7 +84,7 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 		cfg.logger = slog.New(slog.NewJSONHandler(cfg.buf, nil))
 
 		// Now call NewLogging with only the logger and extraAttributes.
-		r.Use(NewLogging(*cfg.logger, cfg.extraAttributes))
+		r.Use(NewContextLogMiddleware(*cfg.logger, cfg.extraAttributes, nil))
 		r.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 			if l := GetLogger(r.Context()); l != nil {
 				l.Info("test log message")
