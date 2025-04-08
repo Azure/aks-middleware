@@ -13,7 +13,6 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-// routerConfig now only holds the extraAttributes map (source is not customizable).
 type routerConfig struct {
 	buf             *bytes.Buffer
 	logger          *slog.Logger
@@ -37,7 +36,6 @@ const (
 
 var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 	var (
-		// customExtractor remains the same.
 		customExtractor = func(r *http.Request) map[string]string {
 			return map[string]string{
 				string(requestid.CorrelationIDKey): r.Header.Get(requestid.RequestCorrelationIDHeader),
@@ -111,11 +109,9 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 		out := cfg.buf.String()
 		fmt.Println("Output from default router:")
 		fmt.Println(out)
-		// Expect default fields (source always "CtxLog" now).
 		Expect(out).To(ContainSubstring(`"source":"CtxLog"`))
 		Expect(out).To(ContainSubstring(`"time":`))
 		Expect(out).To(ContainSubstring(`"level":"INFO"`))
-		// Verify the test log message.
 		Expect(out).To(ContainSubstring("test log message"))
 		Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
 	})

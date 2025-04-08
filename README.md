@@ -18,7 +18,7 @@
 * 4. [HTTP server](#HTTPserver)
  	* 4.1. [requestid](#requestid-1)
  	* 4.2. [logging (api request/response logger)](#loggingapirequestresponselogger)
- 	* 4.3. [ctxlogger/custom attribute logger (applogger)](#httpctxlogger)
+ 	* 4.3. [ctxlogger (applogger)](#httpctxlogger)
  	* 4.4. [recovery](#recovery-1)
  	* 4.5. [inputvalidate](#inputvalidate)
 	* 4.6  [operationrequest](#operationrequest)
@@ -145,47 +145,65 @@ To use the logging middleware, you need to create a logger and then apply the mi
 
 Code example is included in the test code.
 
-### 4.3. <a id='httpctxlogger'></a>ctx logging/ custom logging (logging with custom attributes)
+### 4.3. <a id='httpctxlogger'></a>ctx logging (applogging)
 
-The custom attribute logger allows you to add custom fields your service needs for logging as well as specify a custom "source" which is the table name for your logs to be routed to. If you do not specify a source, the default "CtxLog" is set. The default fields include "source", "time", "level", "request_id", "request", and "method." In order to have information from a panic also logged (filepath with line number where panic originated, and panic message), you must call the [recovery middleware](https://github.com/Azure/aks-middleware/blob/main/http/server/recovery/recovery.go) first
+The context logger middleware adds a logger to the context that can be used to log out anything that happens during the request lifecycle. These logs get sent to the CtxLog table and can be used for debugging issues in your service. The caller has the option to pass in extra attributes to log out info beyond the defaults the middleware logs. Addtionally, this middleware can be used in conjunction with the OperationRequest middleware to grab operation specific info from the context and include it in the context log attributes. 
 
 ##### <a id='Usage-1'></a>Usage
 
-. To add extra logging fields and values, set the ``attributeInitializerFunc`` and/or ``attributeAssignerFunc`` on the ``AttributeManager`` struct. 
-- The AttributeInitializer is called before the request is served and thus should be used to set any fields that remain static or are modified after the request is served by ServeHTTP()
-- The Attribute Assigner is called after serving the request and can be used to udpate existing fields from the initializer or set new fields.
+To add extra logging fields and values, you can provide an `extraAttributes` map and/or specify operation-specific fields (`opFields`) to include in the logging context. 
 
-For instance, if you wanted to set the ResultType for a custom struct attached to your request context, you could implement an AttributeAssigner like so:
+- The `extraAttributes` map contains static key-value pairs that are merged with the default attributes.
+- The `opFields` slice specifies operation-specific fields to include in the logging context. These fields are extracted from the `OperationRequest` object in the request context.
 
-```
-func(w *customlogging.ResponseRecord, r *http.Request, attributes map[string]interface{}) map[string]interface{} {
-		qosInfo := qos.FromContext(r.Context())
-		// attributes param includes fields already set at beginning of ServeHTTP()
-		switch {
-		case statusCode < 400: // http.StatusBadRequest
-			qosInfo.ResultType = 0
-			qosInfo.ResultCode = "Success"
-		case statusCode < 500: // http.StatusInternalServerError
-			qosInfo.ResultType = 1
-		default:
-			qosInfo.ResultType = 2
-		}
+For instance, if you wanted to include specific operation request fields and custom attributes, you could configure the middleware like so:
 
-		if ctx.Err() != nil {
-			qosInfo = &qos.QosInfo{
-				ResultType:     3,
-				ResultCode:     ReqCanceledErrorCode,
-				ResultCategory: string(apierror.ClientError),
-				ErrorDetails:   "request context was canceled by caller",
-				InnerMessage:   ctx.Err().Error(),
-				HTTPStatusCode: ReqCanceledHttpCode,
-			}
-		}
-		qosFields := setQosFields(region, qosInfo, statusCode, opReq)
-		return qosFields
+```go
+import (
+    "github.com/Azure/aks-middleware/http/server/contextlogger"
+    "github.com/Azure/aks-middleware/http/server/operationrequest"
+    "github.com/gorilla/mux"
+    "log/slog"
+)
+
+func main() {
+    router := mux.NewRouter()
+
+    // Define operation request options
+    opFields := []string{
+        "SubscriptionID",
+        "ResourceGroup",
+        "ResourceName",
+        "APIVersion",
+        "CorrelationID",
+        "OperationID",
+    }
+
+    extraAttributes := map[string]interface{}{
+        "customKey": "customValue",
+    }
+
+    logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+
+    // Apply the context logger middleware
+    router.Use(contextlogger.NewContextLogMiddleware(*logger, extraAttributes, opFields))
+
+    // Define your routes
+    router.HandleFunc("/subscriptions/sub123/resourceGroups/rg123/providers/Microsoft.Test/resourceType1/resourceName/default?api-version=2021-12-01", func(w http.ResponseWriter, r *http.Request) {
+        l := contextlogger.GetLogger(r.Context())
+        if l != nil {
+            l.Info("Example log message")
+        }
+        w.WriteHeader(http.StatusOK)
+    })
+
+    http.ListenAndServe(":8080", router)
 }
 ```
-Additional code examples are included in the test code.
+
+The `BuildAttributes` function in the middleware automatically merges the default attributes, extra attributes, and operation-specific fields into the logging context. This ensures that all relevant information is included in the logs.
+
+More examples included in the test code
 
 ### 4.4. <a id='recovery-1'></a>recovery
 

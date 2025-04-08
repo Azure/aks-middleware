@@ -39,13 +39,14 @@ var _ = Describe("OperationRequest and ContextLogger Integration", func() {
 	}
 
 	BeforeEach(func() {
+		logBuf = new(bytes.Buffer)
+		logger := slog.New(slog.NewJSONHandler(logBuf, nil))
+
 		router = mux.NewRouter()
+		router.Use(NewContextLogMiddleware(*logger, nil, nil))
 
 		subRouter := router.PathPrefix("/subscriptions").Subrouter()
 		subRouter.Use(opreq.NewOperationRequest("test-region", defaultOpts))
-
-		logBuf = new(bytes.Buffer)
-		logger := slog.New(slog.NewJSONHandler(logBuf, nil))
 
 		// operation request fields that should be included in ctxlog attrs
 		// caller can specify what fields to include to keep it generic
@@ -79,6 +80,14 @@ var _ = Describe("OperationRequest and ContextLogger Integration", func() {
 			}
 			w.WriteHeader(http.StatusOK)
 		}).Methods(http.MethodPost)
+
+		router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+			l := GetLogger(r.Context())
+			if l != nil {
+				l.Info("health check log message")
+			}
+			w.WriteHeader(http.StatusOK)
+		}).Methods(http.MethodGet)
 
 		server = httptest.NewServer(router)
 	})
@@ -116,5 +125,49 @@ var _ = Describe("OperationRequest and ContextLogger Integration", func() {
 		Expect(outStr).ToNot(ContainSubstring("RouteName"))
 		Expect(outStr).ToNot(ContainSubstring(`"ResourceType":"Microsoft.Test/resourceType1"`))
 		Expect(outStr).ToNot(ContainSubstring("AdditionalHeader"))
+	})
+
+	It("should log default context attributes", func() {
+		url := server.URL + "/subscriptions/sub123/resourceGroups/rg123/providers/Microsoft.Test/resourceType1/resourceName/default?api-version=2021-12-01"
+		req, err := http.NewRequest(http.MethodPost, url, strings.NewReader("payload-data"))
+		Expect(err).NotTo(HaveOccurred())
+
+		resp, err := http.DefaultClient.Do(req)
+		Expect(err).NotTo(HaveOccurred())
+		defer resp.Body.Close()
+		Expect(resp.StatusCode).To(Equal(http.StatusOK))
+
+		logOutput, err := io.ReadAll(logBuf)
+		Expect(err).NotTo(HaveOccurred())
+		outStr := string(logOutput)
+		Expect(outStr).To(ContainSubstring("time"))
+		Expect(outStr).To(ContainSubstring("level"))
+		Expect(outStr).To(ContainSubstring("request_id"))
+		Expect(outStr).To(ContainSubstring("method"))
+	})
+
+	It("should log default attributes for health check route in integration test", func() {
+		url := server.URL + "/health"
+		req, err := http.NewRequest(http.MethodGet, url, nil)
+		Expect(err).NotTo(HaveOccurred())
+
+		resp, err := http.DefaultClient.Do(req)
+		Expect(err).NotTo(HaveOccurred())
+		defer resp.Body.Close()
+		Expect(resp.StatusCode).To(Equal(http.StatusOK))
+
+		logOutput, err := io.ReadAll(logBuf)
+		Expect(err).NotTo(HaveOccurred())
+		outStr := string(logOutput)
+		Expect(outStr).To(ContainSubstring("time"))
+		Expect(outStr).To(ContainSubstring("level"))
+		Expect(outStr).To(ContainSubstring("request"))
+		Expect(outStr).To(ContainSubstring("method"))
+		Expect(outStr).To(ContainSubstring("CtxLog"))
+		// should not contain any operation request details
+		Expect(outStr).ToNot(ContainSubstring(`"SubscriptionID":"sub123"`))
+		Expect(outStr).ToNot(ContainSubstring(`"ResourceGroup":"rg123"`))
+		Expect(outStr).ToNot(ContainSubstring(`"ResourceName":"resourceName"`))
+
 	})
 })
