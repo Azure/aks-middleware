@@ -21,7 +21,6 @@ var _ = Describe("OperationRequest", func() {
 		validURL string
 	)
 
-	// no-op customizer for map[string]interface{}
 	noOpCustomizer := OperationRequestCustomizerFunc(func(extras map[string]interface{}, headers http.Header, vars map[string]string) error {
 		return nil
 	})

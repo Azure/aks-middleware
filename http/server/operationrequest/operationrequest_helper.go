@@ -14,7 +14,7 @@ import (
 	"github.com/gorilla/mux"
 )
 
-// BaseOperationRequest contains the common fields.
+// BaseOperationRequest contains the common fields
 type BaseOperationRequest struct {
 	APIVersion       string
 	SubscriptionID   string

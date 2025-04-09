@@ -20,7 +20,7 @@ var _ = Describe("OperationRequest Context Examination Integration", func() {
 		validOpURL, health string
 	)
 
-	// Define a customizer that extracts an extra header.
+	// Define a customizer that extracts an extra header
 	extrasCustomizer := OperationRequestCustomizerFunc(func(e map[string]interface{}, headers http.Header, vars map[string]string) error {
 		if v := headers.Get("X-Custom-Extra"); v != "" {
 			e["MyCustomHeader"] = v
