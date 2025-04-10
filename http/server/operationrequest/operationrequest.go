@@ -15,7 +15,7 @@ const ARMTimeout = 60 * time.Second
 var _ http.Handler = &operationRequestMiddleware{}
 
 // NewOperationRequest creates an operationRequestMiddleware using the provided options.
-// The options contains both the Extras value and its customizer
+// The options contains both the Extras value and its customizer.
 func NewOperationRequest(region string, opts OperationRequestOptions) mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return &operationRequestMiddleware{
