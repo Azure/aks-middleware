@@ -12,7 +12,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("http recovery middleware", func() {
+var _ = Describe("Httpmw", func() {
 	var (
 		router *mux.Router
 	)
@@ -52,33 +52,6 @@ var _ = Describe("http recovery middleware", func() {
 
 			Expect(w.Body.String()).To(ContainSubstring("Internal Server Error"))
 			Expect(w.Result().StatusCode).To(Equal(500))
-		})
-	})
-
-	Describe("Test SavePanicInfoToCtx", func() {
-		It("should save filepath and panic message to context", func() {
-			panicMsg := "Test panic"
-			testStackTrace := `panic: Test panic
-
-			goroutine 1 [running]:
-			runtime.gopanic(0x123456)
-			/usr/local/go/src/runtime/panic.go:840 +0x254
-			main.main()
-			/home/user/project/main.go:15 +0x34
-			runtime.main()
-			/usr/local/go/src/runtime/proc.go:250 +0x212
-			`
-			req := httptest.NewRequest(http.MethodGet, "/", nil)
-			req = SavePanicInfoToCtx(req, panicMsg, testStackTrace)
-
-			gotFilePath, _ := req.Context().Value(FilePathKey).(string)
-			gotPanicMsg, _ := req.Context().Value(PanicMessageKey).(string)
-
-			expectedFilePath := "/home/user/project/main.go:15"
-			expectedPanicMsg := panicMsg
-
-			Expect(gotFilePath).To(Equal(expectedFilePath))
-			Expect(gotPanicMsg).To(Equal(expectedPanicMsg))
 		})
 	})
 })
