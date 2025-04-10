@@ -186,7 +186,7 @@ func main() {
     logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
     // Apply the context logger middleware
-    router.Use(contextlogger.NewContextLogMiddleware(*logger, extraAttributes, opFields))
+    router.Use(contextlogger.New(*logger, extraAttributes, opFields))
 
     // Define your routes
     router.HandleFunc("/subscriptions/sub123/resourceGroups/rg123/providers/Microsoft.Test/resourceType1/resourceName/default?api-version=2021-12-01", func(w http.ResponseWriter, r *http.Request) {

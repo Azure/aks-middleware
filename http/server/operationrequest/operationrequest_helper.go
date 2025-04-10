@@ -138,3 +138,31 @@ func FlattenOperationRequest(op *BaseOperationRequest) map[string]interface{} {
     }
     return result
 }
+
+// Add a new method to encapsulate the filtered operation request logic.
+func FilteredOperationRequestMap(op *BaseOperationRequest, opFields []string) map[string]interface{} {
+	flatMap := FlattenOperationRequest(op)
+	filtered := make(map[string]interface{})
+
+	// For each requested field (from opFields)
+	for _, reqField := range opFields {
+		// Look in the top-level flattened map.
+		for key, val := range flatMap {
+			if strings.EqualFold(key, reqField) {
+				filtered[key] = val
+			}
+		}
+		// If the key is in the Extras sub-map, include it.
+		if extrasVal, exists := flatMap["Extras"]; exists {
+			if extrasMap, ok := extrasVal.(map[string]interface{}); ok {
+				for extraKey, extraVal := range extrasMap {
+					if strings.EqualFold(extraKey, reqField) {
+						filtered[extraKey] = extraVal
+					}
+				}
+			}
+		}
+	}
+
+	return filtered
+}

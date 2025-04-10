@@ -1,6 +1,9 @@
 package requestid
 
 import (
+	"crypto/rand"
+	"encoding/base64"
+	"io"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -72,5 +75,18 @@ func DefaultHeaderExtractor(r *http.Request) map[string]string {
 		string(OperationIDKey):        r.Header.Get(RequestAcsOperationIDHeader),
 		string(ARMClientRequestIDKey): r.Header.Get(RequestARMClientRequestIDHeader),
 	}
+
+	// Check if AcsOperationIDHeader is missing and generate a new one if needed
+	if headers[string(OperationIDKey)] == "" {
+		newRequestID := generateRequestID()
+		headers["request-id"] = newRequestID
+	}
+
 	return headers
+}
+
+func generateRequestID() string {
+	b := make([]byte, 6)
+	io.ReadFull(rand.Reader, b)
+	return base64.RawURLEncoding.EncodeToString(b)
 }
