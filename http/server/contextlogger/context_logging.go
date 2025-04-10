@@ -98,12 +98,13 @@ func defaultCtxLogAttributes(r *http.Request) []interface{} {
 	}
 }
 
-// GetLogger returns the logger stored in the context.
-// It will return nil if no logger was injected.
 func GetLogger(ctx context.Context) *slog.Logger {
-	logger, ok := ctx.Value(ctxLoggerKey).(*slog.Logger)
-	if !ok {
-		return nil
+	logger := slog.Default().With("src", "self gen, not available in ctx")
+	if ctx == nil {
+		return logger
+	}
+	if ctxlogger, ok := ctx.Value(ctxLoggerKey).(*slog.Logger); ok {
+		return ctxlogger
 	}
 	return logger
 }
