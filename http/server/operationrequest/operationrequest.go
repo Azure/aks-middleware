@@ -12,13 +12,13 @@ import (
 
 const ARMTimeout = 60 * time.Second
 
-var _ http.Handler = &operationRequestMiddleware[any]{}
+var _ http.Handler = &operationRequestMiddleware{}
 
 // NewOperationRequest creates an operationRequestMiddleware using the provided options.
 // The options contains both the Extras value and its customizer.
-func NewOperationRequest[T any](region string, opts OperationRequestOptions[T]) mux.MiddlewareFunc {
+func NewOperationRequest(region string, opts OperationRequestOptions) mux.MiddlewareFunc {
     return func(next http.Handler) http.Handler {
-        return &operationRequestMiddleware[T]{
+        return &operationRequestMiddleware{
             next:   next,
             region: region,
             opts:   opts,
@@ -26,14 +26,14 @@ func NewOperationRequest[T any](region string, opts OperationRequestOptions[T]) 
     }
 }
 
-type operationRequestMiddleware[T any] struct {
+type operationRequestMiddleware struct {
     next   http.Handler
     region string
-    opts   OperationRequestOptions[T]
+    opts   OperationRequestOptions
 }
 
-func (op *operationRequestMiddleware[T]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-    opReq, err := NewBaseOperationRequest[T](r, op.region, op.opts)
+func (op *operationRequestMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+    opReq, err := NewBaseOperationRequest(r, op.region, op.opts)
     if err != nil {
         http.Error(w, fmt.Errorf("failed to create operation request: %w", err).Error(), http.StatusInternalServerError)
         return

@@ -13,10 +13,6 @@ import (
     . "github.com/onsi/gomega"
 )
 
-type TestExtras struct {
-    MyCustomHeader string `json:"myCustomHeader"`
-}
-
 var _ = Describe("OperationRequest Context Examination Integration", func() {
     var (
         router             *mux.Router
@@ -24,16 +20,16 @@ var _ = Describe("OperationRequest Context Examination Integration", func() {
         validOpURL, health string
     )
 
-    // Define a customizer that extracts an extra header.
-    extrasCustomizer := OperationRequestCustomizerFunc[TestExtras](func(e *TestExtras, headers http.Header, vars map[string]string) error {
+    // Define a customizer that extracts an extra header
+    extrasCustomizer := OperationRequestCustomizerFunc(func(e map[string]interface{}, headers http.Header, vars map[string]string) error {
         if v := headers.Get("X-Custom-Extra"); v != "" {
-            e.MyCustomHeader = v
+            e["MyCustomHeader"] = v
         }
         return nil
     })
 
-	defaultOpts := OperationRequestOptions[TestExtras]{
-        Extras:     TestExtras{},
+    defaultOpts := OperationRequestOptions{
+        Extras:     make(map[string]interface{}),
         Customizer: extrasCustomizer,
     }
 
@@ -48,7 +44,7 @@ var _ = Describe("OperationRequest Context Examination Integration", func() {
         routePattern := "/{subscriptionId}/resourceGroups/{resourceGroup}/providers/{resourceProvider}/{resourceType}/{resourceName}/default"
         validOpURL = "/subscriptions/sub3/resourceGroups/rg3/providers/Microsoft.Test/resourceType1/resourceName1/default?api-version=2021-12-01"
         finalHandler := func(w http.ResponseWriter, r *http.Request) {
-            op := OperationRequestFromContext[TestExtras](r.Context())
+            op := OperationRequestFromContext(r.Context())
             if op == nil {
                 http.Error(w, "missing operation request", http.StatusInternalServerError)
                 return
@@ -85,11 +81,11 @@ var _ = Describe("OperationRequest Context Examination Integration", func() {
         Expect(err).NotTo(HaveOccurred())
         req.Header.Set(common.RequestCorrelationIDHeader, "corr-test-context")
         req.Header.Set(common.RequestAcceptLanguageHeader, "EN-GB")
-		// Do not provide an OperationID header so that one is auto-generated.
+        // Do not provide an OperationID header so that one is auto-generated.
         req.Header.Set("X-Custom-Extra", "customValue")
 
-		// The full pipeline routes the request through the middleware which sets URL variables,
-		// attaches the current route, and builds the OperationRequest.
+        // The full pipeline routes the request through the middleware which sets URL variables,
+        // attaches the current route, and builds the OperationRequest.
         resp, err := http.DefaultClient.Do(req)
         Expect(err).NotTo(HaveOccurred())
         defer resp.Body.Close()
@@ -98,7 +94,7 @@ var _ = Describe("OperationRequest Context Examination Integration", func() {
         data, err := io.ReadAll(resp.Body)
         Expect(err).NotTo(HaveOccurred())
 
-        var op BaseOperationRequest[TestExtras]
+        var op BaseOperationRequest
         err = json.Unmarshal(data, &op)
         Expect(err).NotTo(HaveOccurred())
 
@@ -112,12 +108,12 @@ var _ = Describe("OperationRequest Context Examination Integration", func() {
         Expect(op.RouteName).To(Equal("exampleRoute"))
         Expect(op.Region).To(Equal("region-test"))
         Expect(op.Body).To(Equal([]byte(payload)))
-        Expect(op.Extras.MyCustomHeader).To(Equal("customValue"))
+        Expect(op.Extras["MyCustomHeader"]).To(Equal("customValue"))
     })
 
-	It("should return an error when api-version is missing", func() {
+    It("should return an error when api-version is missing", func() {
         payload := "payload without api-version"
-		// Create a URL without the required query parameter.
+        // Create a URL without the required query parameter.
         errorURL := "/subscriptions/sub3/resourceGroups/rg3/providers/Microsoft.Test/resourceType1/resourceName1/default"
         req, err := http.NewRequest(http.MethodPost, server.URL+errorURL, strings.NewReader(payload))
         Expect(err).NotTo(HaveOccurred())

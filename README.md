@@ -17,8 +17,8 @@
  	* 3.3. [retry](#retry)
 * 4. [HTTP server](#HTTPserver)
  	* 4.1. [requestid](#requestid-1)
- 	* 4.2. [ctxlogger (applogger)](#ctxloggerapplogger-1)
- 	* 4.3. [logging (api request/response logger)](#loggingapirequestresponselogger)
+ 	* 4.2. [logging (api request/response logger)](#loggingapirequestresponselogger)
+ 	* 4.3. [ctxlogger (applogger)](#httpctxlogger)
  	* 4.4. [recovery](#recovery-1)
  	* 4.5. [inputvalidate](#inputvalidate)
 	* 4.6  [operationrequest](#operationrequest)
@@ -134,11 +134,8 @@ It extracts Azure Resource Manager required HTTP headers from the request and pu
 
 The current implementation is not consistent with its gRPC counterpart.
 
-### 4.2. <a id='ctxloggerapplogger-1'></a>ctxlogger (applogger)
 
-Missing.
-
-### 4.3. <a id='loggingapirequestresponselogger'></a>logging (api request/response logger)
+### 4.2. <a id='loggingapirequestresponselogger'></a>logging (api request/response logger)
 
 The logging middleware logs details about each HTTP request and response, including the request method, URL, status code, and duration.
 
@@ -147,6 +144,66 @@ The logging middleware logs details about each HTTP request and response, includ
 To use the logging middleware, you need to create a logger and then apply the middleware to your router.
 
 Code example is included in the test code.
+
+### 4.3. <a id='httpctxlogger'></a>ctx logging (applogging)
+
+The context logger middleware adds a logger to the context that can be used to log out anything that happens during the request lifecycle. These logs get sent to the CtxLog table and can be used for debugging issues in your service. The caller has the option to pass in extra attributes to log out info beyond the defaults the middleware logs. Addtionally, this middleware can be used in conjunction with the OperationRequest middleware to grab operation specific info from the context and include it in the context log attributes. 
+
+##### <a id='Usage-1'></a>Usage
+
+To add extra logging fields and values, you can provide an `extraAttributes` map and/or specify operation-specific fields (`opFields`) to include in the logging context. 
+
+- The `extraAttributes` map contains static key-value pairs that are merged with the default attributes.
+- The `opFields` slice specifies operation-specific fields to include in the logging context. These fields are extracted from the `OperationRequest` object in the request context.
+
+For instance, if you wanted to include specific operation request fields and custom attributes, you could configure the middleware like so:
+
+```go
+import (
+    "github.com/Azure/aks-middleware/http/server/contextlogger"
+    "github.com/Azure/aks-middleware/http/server/operationrequest"
+    "github.com/gorilla/mux"
+    "log/slog"
+)
+
+func main() {
+    router := mux.NewRouter()
+
+    // Define operation request options
+    opFields := []string{
+        "SubscriptionID",
+        "ResourceGroup",
+        "ResourceName",
+        "APIVersion",
+        "CorrelationID",
+        "OperationID",
+    }
+
+    extraAttributes := map[string]interface{}{
+        "customKey": "customValue",
+    }
+
+    logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+
+    // Apply the context logger middleware
+    router.Use(contextlogger.New(*logger, extraAttributes, opFields))
+
+    // Define your routes
+    router.HandleFunc("/subscriptions/sub123/resourceGroups/rg123/providers/Microsoft.Test/resourceType1/resourceName/default?api-version=2021-12-01", func(w http.ResponseWriter, r *http.Request) {
+        l := contextlogger.GetLogger(r.Context())
+        if l != nil {
+            l.Info("Example log message")
+        }
+        w.WriteHeader(http.StatusOK)
+    })
+
+    http.ListenAndServe(":8080", router)
+}
+```
+
+The `BuildAttributes` function in the middleware automatically merges the default attributes, extra attributes, and operation-specific fields into the logging context. This ensures that all relevant information is included in the logs.
+
+More examples included in the test code
 
 ### 4.4. <a id='recovery-1'></a>recovery
 
