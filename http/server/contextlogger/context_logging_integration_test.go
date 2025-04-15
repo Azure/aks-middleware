@@ -37,10 +37,7 @@ var _ = Describe("OperationRequest and ContextLogger Integration", func() {
 		router.Use(requestid.NewRequestIDMiddleware())
 		// Attach global context logging middleware so that even routes without subrouter-specific
 		// context middleware get a default logger in the context.
-		router.Use(New(*logger, Options{
-			ExtraAttributes: nil,
-			ExtractFunc:     nil,
-		}))
+		router.Use(New(*logger, nil))
 
 		// Define a customizer that extracts an extra header.
 		extrasCustomizer := opreq.OperationRequestCustomizerFunc(func(e map[string]interface{}, headers http.Header, vars map[string]string) error {
@@ -60,27 +57,29 @@ var _ = Describe("OperationRequest and ContextLogger Integration", func() {
 		subRouter := router.PathPrefix("/subscriptions").Subrouter()
 
 		// The following middleware adds operation request details into the request's context.
-		// If no context middleware is used on the subrouter (or if global middleware is used only),
-		// then operation request details (like SubscriptionID, ResourceGroup, etc.) will not be injected
-		// into the request context and the logging will not include these details.
+		// If no context middleware is used on the subrouter (or if global context log middleware is used only),
+		// then logging will not include these  operation request details, since the top level middleware gets executed first.
+		// For the context log interceptor to get extra info from other interceptors, the other interceptors must execute before
 		//
 		// The operation request middleware must come before the context logging middleware
 		// on the subrouter. This ensures that the operation request details are present in the context when
-		// the logging middleware builds its attributes.
+		// the logging middleware builds its attributes
+
+		// TODO (tomabraham): Register a top level operation request interceptor that can dynamcally extract
+		// relevant informaiton for all routes
 		subRouter.Use(opreq.NewOperationRequest("test-region", defaultOpts))
 		// Then add logging middleware to capture op request details from the context.
-		subRouter.Use(New(*logger, Options{
-			ExtractFunc: func(ctx context.Context, r *http.Request) map[string]interface{} {
-				op := opreq.OperationRequestFromContext(ctx)
-				if op == nil {
-					return nil
-				}
-				return opreq.FilteredOperationRequestMap(op, []string{
-					"TargetURI", "HttpMethod", "AcceptedLanguage", "APIVersion", "Region",
-					"SubscriptionID", "ResourceGroup", "ResourceName", "CorrelationID", "OperationID", "MyCustomHeader",
-				})
-			},
-		}))
+		subRouter.Use(New(*logger, func(ctx context.Context, r *http.Request) map[string]interface{} {
+			op := opreq.OperationRequestFromContext(ctx)
+			if op == nil {
+				return nil
+			}
+			return opreq.FilteredOperationRequestMap(op, []string{
+				"TargetURI", "HttpMethod", "AcceptedLanguage", "APIVersion", "Region",
+				"SubscriptionID", "ResourceGroup", "ResourceName", "CorrelationID", "OperationID", "MyCustomHeader",
+			})
+		},
+		))
 
 		routePattern := fmt.Sprintf("/{%s}/resourceGroups/{%s}/providers/{%s}/{%s}/{%s}/default",
 			common.SubscriptionIDKey, common.ResourceGroupKey, common.ResourceProviderKey, common.ResourceTypeKey, common.ResourceNameKey)

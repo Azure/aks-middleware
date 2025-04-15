@@ -11,10 +11,7 @@ import (
 
 type loggerKeyType string
 
-type Options struct {
-	ExtraAttributes map[string]interface{}
-	ExtractFunc     func(ctx context.Context, r *http.Request) map[string]interface{}
-}
+type ExtractFunction func(ctx context.Context, r *http.Request) map[string]interface{}
 
 const (
 	ctxLogSource               = "CtxLog"
@@ -24,14 +21,14 @@ const (
 // New creates a context logging middleware.
 // Parameters
 //
-//	logger:          A slog.Logger instance used for logging.
-//	options:         An Options instance containing extra attributes and an extract function.
-func New(logger slog.Logger, options Options) mux.MiddlewareFunc {
+//	logger:                  A slog.Logger instance used for logging. Any static attributes added to this logger before passing it in will be preserved
+//	extractFunction:         ExtractFunction extracts information from the ctx and/or the request and put it in the logger
+func New(logger slog.Logger, extractFunction ExtractFunction) mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return &contextLogMiddleware{
-			next:    next,
-			logger:  logger,
-			options: options,
+			next:            next,
+			logger:          logger,
+			extractFunction: extractFunction,
 		}
 	}
 }
@@ -40,14 +37,14 @@ func New(logger slog.Logger, options Options) mux.MiddlewareFunc {
 var _ http.Handler = &contextLogMiddleware{}
 
 type contextLogMiddleware struct {
-	next    http.Handler
-	logger  slog.Logger
-	options Options
+	next            http.Handler
+	logger          slog.Logger
+	extractFunction ExtractFunction
 }
 
 func (m *contextLogMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	attributes := BuildAttributes(ctx, r, m.options.ExtraAttributes, m.options.ExtractFunc)
+	attributes := BuildAttributes(ctx, r, m.extractFunction)
 	contextLogger := m.logger.With(attributes...)
 	ctx = context.WithValue(ctx, ctxLoggerKey, contextLogger)
 	r = r.WithContext(ctx)
@@ -55,7 +52,7 @@ func (m *contextLogMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	m.next.ServeHTTP(w, r)
 }
 
-func BuildAttributes(ctx context.Context, r *http.Request, extra map[string]interface{}, extractFunc func(ctx context.Context, r *http.Request) map[string]interface{}) []interface{} {
+func BuildAttributes(ctx context.Context, r *http.Request, extractFunc func(ctx context.Context, r *http.Request) map[string]interface{}) []interface{} {
 	md, ok := metadata.FromIncomingContext(ctx)
 	headers := make(map[string]string)
 	if ok {
@@ -68,11 +65,6 @@ func BuildAttributes(ctx context.Context, r *http.Request, extra map[string]inte
 
 	attributes := defaultCtxLogAttributes(r)
 	logAttrs := make(map[string]interface{})
-
-	// Merge any caller-supplied extra attributes.
-	for k, v := range extra {
-		logAttrs[k] = v
-	}
 
 	// Use the extract function to get additional attributes.
 	if extractFunc != nil {
