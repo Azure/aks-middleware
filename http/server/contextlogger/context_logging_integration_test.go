@@ -33,10 +33,10 @@ var _ = Describe("OperationRequest and ContextLogger Integration", func() {
 		router = mux.NewRouter()
 
 		// Global middleware on the root router:
-		// Add request ID middleware so that every request gets a generated request ID.
+		// Add request ID interceptor so that every request gets a generated request ID.
 		router.Use(requestid.NewRequestIDMiddleware())
-		// Attach global context logging middleware so that even routes without subrouter-specific
-		// context middleware get a default logger in the context.
+		// Attach global context logging interceptor so that even routes without subrouter-specific
+		// context interceptor get a default logger in the context.
 		router.Use(New(*logger, nil))
 
 		// Define a customizer that extracts an extra header.
@@ -56,19 +56,19 @@ var _ = Describe("OperationRequest and ContextLogger Integration", func() {
 		// Create a sub-router for API routes that require operation request injection.
 		subRouter := router.PathPrefix("/subscriptions").Subrouter()
 
-		// The following middleware adds operation request details into the request's context.
-		// If no context middleware is used on the subrouter (or if global context log middleware is used only),
-		// then logging will not include these  operation request details, since the top level middleware gets executed first.
+		// The following interceptor adds operation request details into the request's context.
+		// If no context log interceptor is used on the subrouter (or if global context log interceptor is used only),
+		// then logging will not include these  operation request details, since the top level interceptors gets executed first.
 		// For the context log interceptor to get extra info from other interceptors, the other interceptors must execute before
 		//
-		// The operation request middleware must come before the context logging middleware
+		// The operation request interceptor must come before the context logging interceptor
 		// on the subrouter. This ensures that the operation request details are present in the context when
-		// the logging middleware builds its attributes
+		// the context logging interceptor builds its attributes
 
 		// TODO (tomabraham): Register a top level operation request interceptor that can dynamcally extract
 		// relevant informaiton for all routes
 		subRouter.Use(opreq.NewOperationRequest("test-region", defaultOpts))
-		// Then add logging middleware to capture op request details from the context.
+		// Then add logging interceptor to capture op request details from the context.
 		subRouter.Use(New(*logger, func(ctx context.Context, r *http.Request) map[string]interface{} {
 			op := opreq.OperationRequestFromContext(ctx)
 			if op == nil {
@@ -93,9 +93,9 @@ var _ = Describe("OperationRequest and ContextLogger Integration", func() {
 		}).Methods(http.MethodPost)
 
 		// The /health route is attached directly to the root router.
-		// Since the root router already has the global context logging middleware,
+		// Since the root router already has the global context logging interceptor,
 		// it will log default attributes. However, it will not have any operation request data,
-		// because those are only added by the operation request middleware used on the subrouter.
+		// because those are only added by the operation request interceptor used on the subrouter.
 		router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 			l := GetLogger(r.Context())
 			if l != nil {
