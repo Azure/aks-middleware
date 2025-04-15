@@ -77,6 +77,7 @@ func DefaultHeaderExtractor(r *http.Request) map[string]string {
 	}
 
 	// Check if AcsOperationIDHeader is missing and generate a new one if needed
+	// TODO (tomabraham): Merge with operationrequest package
 	if headers[string(OperationIDKey)] == "" {
 		newRequestID := generateRequestID()
 		headers["request-id"] = newRequestID

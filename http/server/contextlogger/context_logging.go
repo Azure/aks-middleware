@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	opreq "github.com/Azure/aks-middleware/http/server/operationrequest"
 	"github.com/gorilla/mux"
 	"google.golang.org/grpc/metadata"
 )
@@ -18,12 +19,28 @@ const (
 	ctxLoggerKey loggerKeyType = "CtxLogKey"
 )
 
+// DefaultExtractor extracts operation request fields from the context.
+// It returns the filtered map containing only the specified keys.
+func DefaultExtractor(ctx context.Context, r *http.Request) map[string]interface{} {
+	op := opreq.OperationRequestFromContext(ctx)
+	if op == nil {
+		return nil
+	}
+	return opreq.FilteredOperationRequestMap(op, []string{
+		"TargetURI", "HttpMethod", "AcceptedLanguage", "APIVersion", "Region",
+		"SubscriptionID", "ResourceGroup", "ResourceName", "CorrelationID", "OperationID",
+	})
+}
+
 // New creates a context logging middleware.
 // Parameters
 //
 //	logger:                  A slog.Logger instance used for logging. Any static attributes added to this logger before passing it in will be preserved
 //	extractFunction:         ExtractFunction extracts information from the ctx and/or the request and put it in the logger
 func New(logger slog.Logger, extractFunction ExtractFunction) mux.MiddlewareFunc {
+	if extractFunction == nil {
+		extractFunction = DefaultExtractor
+	}
 	return func(next http.Handler) http.Handler {
 		return &contextLogMiddleware{
 			next:            next,
@@ -82,9 +99,8 @@ func BuildAttributes(ctx context.Context, r *http.Request, extractFunc func(ctx 
 }
 
 func defaultCtxLogAttributes(r *http.Request) []interface{} {
-	requestPath := r.URL.Path
 	return []interface{}{
-		"request", requestPath,
+		"request", r.URL.Path,
 		"method", r.Method,
 		"source", ctxLogSource,
 	}

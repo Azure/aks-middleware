@@ -108,8 +108,6 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 		Expect(out).To(ContainSubstring(`"source":"CtxLog"`))
 		Expect(out).To(ContainSubstring(`"method":"GET"`))
 		Expect(out).To(ContainSubstring("test log message"))
-		Expect(out).ToNot(ContainSubstring(subscriptionIDKey))
-		Expect(out).ToNot(ContainSubstring(customTestKey))
 		Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
 	})
 
