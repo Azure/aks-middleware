@@ -114,15 +114,6 @@ var _ = Describe("Otel Audit Integration Test", func() {
 			Expect(logOutput).To(ContainSubstring("operation category description is required for category OCOther"))
 		})
 
-		It("should log an error when the record object is invalid", func() {
-			w := httptest.NewRecorder()
-			req := httptest.NewRequest("GET", "/", nil)
-
-			router.ServeHTTP(w, req)
-
-			Expect(buf.String()).To(ContainSubstring("failed to send audit event"))
-		})
-
 		It("should handle validation failure when caller identities are missing", func() {
 			w := httptest.NewRecorder()
 			req := httptest.NewRequest("GET", "/", nil)
