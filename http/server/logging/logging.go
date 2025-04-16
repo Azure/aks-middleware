@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Azure/aks-middleware/http/common/logging"
 	"github.com/gorilla/mux"
 	"google.golang.org/grpc/metadata"
 )
@@ -33,29 +34,6 @@ type loggingMiddleware struct {
 	now    func() time.Time
 	logger *slog.Logger
 }
-
-type responseWriter struct {
-	http.ResponseWriter
-	statusCode int
-	buf        *bytes.Buffer
-}
-
-func (w *responseWriter) WriteHeader(code int) {
-	w.statusCode = code
-	w.ResponseWriter.WriteHeader(code)
-}
-
-func (w *responseWriter) Write(b []byte) (int, error) {
-	if w.buf == nil {
-		w.buf = new(bytes.Buffer)
-	}
-	w.buf.Write(b)
-	if w.statusCode == 0 {
-		w.statusCode = http.StatusOK
-	}
-	return w.ResponseWriter.Write(b)
-}
-
 type RequestLogData struct {
 	Code     int
 	Duration time.Duration
@@ -63,9 +41,9 @@ type RequestLogData struct {
 }
 
 func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	customWriter := &responseWriter{
+	customWriter := &logging.ResponseWriter{
 		ResponseWriter: w,
-		buf:            new(bytes.Buffer),
+		Buf:            new(bytes.Buffer),
 	}
 
 	startTime := l.now()
@@ -79,12 +57,12 @@ func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// If error, extract the buffered response body as error message.
 	errorMsg := ""
-	if customWriter.statusCode >= http.StatusBadRequest {
-		errorMsg = customWriter.buf.String()
+	if customWriter.StatusCode >= http.StatusBadRequest {
+		errorMsg = customWriter.Buf.String()
 	}
 
 	data := RequestLogData{
-		Code:     customWriter.statusCode,
+		Code:     customWriter.StatusCode,
 		Duration: latency,
 		Error:    errorMsg,
 	}

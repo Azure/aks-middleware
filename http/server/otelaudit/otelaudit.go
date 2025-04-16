@@ -6,30 +6,9 @@ import (
 	"time"
 
 	"log/slog"
+
+	"github.com/Azure/aks-middleware/http/common/logging"
 )
-
-// responseWriter buffers the output and status code.
-type responseWriter struct {
-	http.ResponseWriter
-	statusCode int
-	buf        *bytes.Buffer
-}
-
-func (w *responseWriter) WriteHeader(code int) {
-	w.statusCode = code
-	w.ResponseWriter.WriteHeader(code)
-}
-
-func (w *responseWriter) Write(b []byte) (int, error) {
-	if w.buf == nil {
-		w.buf = new(bytes.Buffer)
-	}
-	w.buf.Write(b)
-	if w.statusCode == 0 {
-		w.statusCode = http.StatusOK
-	}
-	return w.ResponseWriter.Write(b)
-}
 
 // Middleware implements a separate OTEL audit middleware.
 type Middleware struct {
@@ -41,9 +20,9 @@ type Middleware struct {
 
 // ServeHTTP wraps the request and triggers the audit event.
 func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	customWriter := &responseWriter{
+	customWriter := &logging.ResponseWriter{
 		ResponseWriter: w,
-		buf:            new(bytes.Buffer),
+		Buf:            new(bytes.Buffer),
 	}
 
 	ctx := r.Context()
@@ -52,12 +31,12 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// If error, extract the buffered response body as error message.
 	errorMsg := ""
-	if customWriter.statusCode >= http.StatusBadRequest {
-		errorMsg = customWriter.buf.String()
+	if customWriter.StatusCode >= http.StatusBadRequest {
+		errorMsg = customWriter.Buf.String()
 	}
 
 	// Call the OTEL audit event sender.
-	SendOtelAuditEvent(m.logger, m.otelConfig, ctx, customWriter.statusCode, r, errorMsg)
+	SendOtelAuditEvent(m.logger, m.otelConfig, ctx, customWriter.StatusCode, r, errorMsg)
 }
 
 // NewMiddleware returns a middleware function to add OTEL audit logging.

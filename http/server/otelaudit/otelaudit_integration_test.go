@@ -15,7 +15,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Httpmw Integration Test", func() {
+var _ = Describe("Otel Audit Integration Test", func() {
 	var (
 		router     *mux.Router
 		otelConfig *OtelConfig
