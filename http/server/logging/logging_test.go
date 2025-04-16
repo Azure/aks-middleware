@@ -13,7 +13,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Httpmw Integration Test", func() {
+var _ = Describe("Httpmw", func() {
 	var (
 		router     *mux.Router
 		buf        *bytes.Buffer
@@ -21,8 +21,10 @@ var _ = Describe("Httpmw Integration Test", func() {
 	)
 
 	BeforeEach(func() {
+
 		buf = new(bytes.Buffer)
 		slogLogger = slog.New(slog.NewJSONHandler(buf, nil))
+
 		router = mux.NewRouter()
 
 		customExtractor := func(r *http.Request) map[string]string {
@@ -31,13 +33,17 @@ var _ = Describe("Httpmw Integration Test", func() {
 				string(requestid.OperationIDKey):   r.Header.Get(requestid.RequestAcsOperationIDHeader),
 			}
 		}
-
 		router.Use(requestid.NewRequestIDMiddlewareWithExtractor(customExtractor))
 		router.Use(NewLogging(slogLogger))
-		// Common simple endpoint
+
 		router.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
 			time.Sleep(10 * time.Millisecond)
 			w.WriteHeader(http.StatusOK)
+		})
+
+		router.HandleFunc("/error", func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte("test error"))
 		})
 	})
 
@@ -48,15 +54,14 @@ var _ = Describe("Httpmw Integration Test", func() {
 
 			router.ServeHTTP(w, req)
 
-			logOutput := buf.String()
-			Expect(logOutput).To(ContainSubstring("finished call"))
-			Expect(logOutput).To(ContainSubstring(`"source":"ApiRequestLog"`))
-			Expect(logOutput).To(ContainSubstring(`"protocol":"HTTP"`))
-			Expect(logOutput).To(ContainSubstring(`"method_type":"unary"`))
-			Expect(logOutput).To(ContainSubstring(`"component":"server"`))
-			Expect(logOutput).To(ContainSubstring(`"time_ms":`))
-			Expect(logOutput).To(ContainSubstring(`"service":"`))
-			Expect(logOutput).To(ContainSubstring(`"url":"`))
+			Expect(buf.String()).To(ContainSubstring("finished call"))
+			Expect(buf.String()).To(ContainSubstring(`"source":"ApiRequestLog"`))
+			Expect(buf.String()).To(ContainSubstring(`"protocol":"HTTP"`))
+			Expect(buf.String()).To(ContainSubstring(`"method_type":"unary"`))
+			Expect(buf.String()).To(ContainSubstring(`"component":"server"`))
+			Expect(buf.String()).To(ContainSubstring(`"time_ms":`))
+			Expect(buf.String()).To(ContainSubstring(`"service":"`))
+			Expect(buf.String()).To(ContainSubstring(`"url":"`))
 			Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
 		})
 
@@ -68,10 +73,22 @@ var _ = Describe("Httpmw Integration Test", func() {
 
 			router.ServeHTTP(w, req)
 
-			logOutput := buf.String()
-			Expect(logOutput).To(ContainSubstring(`"operationid":"test-operation-id"`))
-			Expect(logOutput).To(ContainSubstring(`"correlationid":"test-correlation-id"`))
+			Expect(buf.String()).To(ContainSubstring(`"operationid":"test-operation-id"`))
+			Expect(buf.String()).To(ContainSubstring(`"correlationid":"test-correlation-id"`))
+			Expect(buf.String()).ToNot(ContainSubstring(`"armclientrequestid"`))
 			Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
+		})
+
+		It("should capture error message for error responses", func() {
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest("GET", "/error", nil)
+
+			router.ServeHTTP(w, req)
+
+			Expect(buf.String()).To(ContainSubstring("finished call"))
+			Expect(buf.String()).To(ContainSubstring(`"code":400`))
+			Expect(buf.String()).To(ContainSubstring("test error"))
+			Expect(w.Result().StatusCode).To(Equal(http.StatusBadRequest))
 		})
 	})
 })
