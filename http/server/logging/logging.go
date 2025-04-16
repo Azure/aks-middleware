@@ -56,6 +56,12 @@ func (w *responseWriter) Write(b []byte) (int, error) {
 	return w.ResponseWriter.Write(b)
 }
 
+type RequestLogData struct {
+	Code     int
+	Duration time.Duration
+	Error    string
+}
+
 func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	customWriter := &responseWriter{
 		ResponseWriter: w,
@@ -77,8 +83,13 @@ func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		errorMsg = customWriter.buf.String()
 	}
 
-	l.LogRequestEnd(ctx, r, "RequestEnd", customWriter.statusCode, latency, errorMsg)
-	l.LogRequestEnd(ctx, r, "finished call", customWriter.statusCode, latency, errorMsg)
+	data := RequestLogData{
+		Code:     customWriter.statusCode,
+		Duration: latency,
+		Error:    errorMsg,
+	}
+	l.LogRequestEnd(ctx, r, "RequestEnd", data)
+	l.LogRequestEnd(ctx, r, "finished call", data)
 
 }
 
@@ -113,7 +124,11 @@ func (l *loggingMiddleware) LogRequestStart(ctx context.Context, r *http.Request
 	l.logger.InfoContext(ctx, msg, attributes...)
 }
 
-func (l *loggingMiddleware) LogRequestEnd(ctx context.Context, r *http.Request, msg string, statusCode int, duration time.Duration, err string) {
-	attributes := BuildAttributes(ctx, r, "code", statusCode, "time_ms", duration.Milliseconds(), "error", err)
-	l.logger.InfoContext(ctx, msg, attributes...)
+func (l *loggingMiddleware) LogRequestEnd(ctx context.Context, r *http.Request, msg string, data RequestLogData) {
+	attributes := BuildAttributes(ctx, r, "code", data.Code, "time_ms", data.Duration.Milliseconds(), "error", data.Error)
+	if data.Code >= http.StatusBadRequest {
+		l.logger.ErrorContext(ctx, msg, attributes...)
+	} else {
+		l.logger.InfoContext(ctx, msg, attributes...)
+	}
 }
