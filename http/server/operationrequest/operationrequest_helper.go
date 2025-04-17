@@ -84,7 +84,7 @@ func NewBaseOperationRequest(req *http.Request, region string, opts OperationReq
 
 	headers := req.Header
 	op.CorrelationID = headers.Get(common.RequestCorrelationIDHeader)
-	op.AcceptedLanguage = strings.ToLower(headers.Get(common.RequestAcceptLanguageHeader))
+	op.AcceptedLanguage = headers.Get(common.RequestAcceptLanguageHeader)
 	if opID := headers.Get(common.RequestAcsOperationIDHeader); opID == "" {
 		op.OperationID = uuid.Must(uuid.NewV4()).String()
 	} else {
