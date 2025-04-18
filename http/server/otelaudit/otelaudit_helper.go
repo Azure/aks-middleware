@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/Azure/aks-middleware/http/common"
 	"github.com/gorilla/mux"
 	"github.com/microsoft/go-otel-audit/audit"
 	"github.com/microsoft/go-otel-audit/audit/msgs"
@@ -18,7 +19,9 @@ type OtelConfig struct {
 	CustomOperationDescs      map[string]string
 	CustomOperationCategories map[string]msgs.OperationCategory
 	OperationAccessLevel      string
-	// map of HTTP method to list of request URIs to exclude from audit
+	// ExcludeAuditEvents maps an HTTP method to a list of URL substrings.
+	// If any substring is present in the full request URL,
+	// the audit event for that request will be excluded.
 	ExcludeAuditEvents map[string][]string
 }
 
@@ -30,7 +33,7 @@ func SendOtelAuditEvent(logger *slog.Logger, otelConfig *OtelConfig, ctx context
 		return
 	}
 
-	if shouldExcludeAudit(req, otelConfig.ExcludeAuditEvents) {
+	if shouldExclude(req, otelConfig.ExcludeAuditEvents) {
 		return
 	}
 
@@ -40,13 +43,12 @@ func SendOtelAuditEvent(logger *slog.Logger, otelConfig *OtelConfig, ctx context
 		return
 	}
 
-	logger.Info("sending audit logs")
 	if err := otelConfig.Client.Send(ctx, msg); err != nil {
 		logger.Error("failed to send audit event", "error", err)
 	}
 }
 
-func shouldExcludeAudit(req *http.Request, excludeMap map[string][]string) bool {
+func shouldExclude(req *http.Request, excludeMap map[string][]string) bool {
 	if excludeMap == nil {
 		return false
 	}
@@ -107,31 +109,11 @@ func getCallerIdentities(req *http.Request) map[msgs.CallerIdentityType][]msgs.C
 	caller := make(map[msgs.CallerIdentityType][]msgs.CallerIdentityEntry)
 
 	// Extract variables from the URL using gorilla/mux.
+	// Assuming the router pattern follows the standard Azure format:
+	// routePattern := "/{subscriptionId}/resourceGroups/{resourceGroup}/providers/{resourceProvider}/{resourceType}/{resourceName}/default"
 	vars := mux.Vars(req)
-	subscriptionID := vars["subscriptionId"]
 
-	clientAppID := req.Header.Get("x-ms-client-app-id")
-	clientPrincipalName := req.Header.Get("x-ms-client-principal-name")
-	clientTenantID := req.Header.Get("x-ms-client-tenant-id")
-
-	if clientAppID != "" {
-		caller[msgs.ApplicationID] = []msgs.CallerIdentityEntry{
-			{
-				Identity:    clientAppID,
-				Description: "client application ID",
-			},
-		}
-	}
-
-	if clientPrincipalName != "" {
-		caller[msgs.UPN] = []msgs.CallerIdentityEntry{
-			{
-				Identity:    clientPrincipalName,
-				Description: "client principal name",
-			},
-		}
-	}
-
+	subscriptionID := vars[common.SubscriptionIDKey]
 	if subscriptionID != "" {
 		caller[msgs.SubscriptionID] = []msgs.CallerIdentityEntry{
 			{
@@ -141,6 +123,27 @@ func getCallerIdentities(req *http.Request) map[msgs.CallerIdentityType][]msgs.C
 		}
 	}
 
+	clientAppID := req.Header.Get("x-ms-client-app-id")
+	if clientAppID != "" {
+		caller[msgs.ApplicationID] = []msgs.CallerIdentityEntry{
+			{
+				Identity:    clientAppID,
+				Description: "client application ID",
+			},
+		}
+	}
+
+	clientPrincipalName := req.Header.Get("x-ms-client-principal-name")
+	if clientPrincipalName != "" {
+		caller[msgs.UPN] = []msgs.CallerIdentityEntry{
+			{
+				Identity:    clientPrincipalName,
+				Description: "client principal name",
+			},
+		}
+	}
+
+	clientTenantID := req.Header.Get("x-ms-client-tenant-id")
 	if clientTenantID != "" {
 		caller[msgs.TenantID] = []msgs.CallerIdentityEntry{
 			{
@@ -163,10 +166,7 @@ func getOperationCategory(method string, opCategoryMapping map[string]msgs.Opera
 }
 
 func getOperationCategoryDescription(method string, opCategoryDesc map[string]string) string {
-	if desc, ok := opCategoryDesc[method]; ok {
-		return desc
-	}
-	return ""
+	return opCategoryDesc[method]
 }
 
 func getOperationType(method string) msgs.OperationType {

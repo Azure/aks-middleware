@@ -5,8 +5,8 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"time"
 
+	"github.com/Azure/aks-middleware/http/common"
 	"github.com/gorilla/mux"
 	"github.com/microsoft/go-otel-audit/audit"
 	"github.com/microsoft/go-otel-audit/audit/conn"
@@ -14,6 +14,63 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
+
+var _ = Describe("createOtelAuditEvent", func() {
+	var (
+		router     *mux.Router
+		otelConf   *OtelConfig
+		buf        *bytes.Buffer
+		logger     *slog.Logger
+		auditEvent msgs.Msg
+		auditErr   error
+	)
+
+	BeforeEach(func() {
+		buf = new(bytes.Buffer)
+		logger = slog.New(slog.NewJSONHandler(buf, nil))
+
+		otelConf = &OtelConfig{
+			CustomOperationDescs: map[string]string{
+				"GET": "CustomDesc for GET",
+			},
+			CustomOperationCategories: map[string]msgs.OperationCategory{
+				"GET": msgs.OCOther,
+			},
+			OperationAccessLevel: "Test Access Level",
+		}
+
+		router = mux.NewRouter()
+		routePattern := "/{" + common.SubscriptionIDKey + "}/resourceGroups/{resourceGroup}/providers/{resourceProvider}/{resourceType}/{resourceName}/default"
+		router.HandleFunc(routePattern, func(w http.ResponseWriter, r *http.Request) {
+			auditEvent, auditErr = createOtelAuditEvent(logger, http.StatusOK, r, otelConf, "")
+			w.WriteHeader(http.StatusOK)
+		}).Methods("GET")
+	})
+
+	It("should extract URL variables and create a valid audit event message", func() {
+		reqURL := "http://example.com/sub-123/resourceGroups/rg-test/providers/Microsoft.Test/resourceType/testResource/default"
+		req := httptest.NewRequest("GET", reqURL, nil)
+		req.RemoteAddr = "127.0.0.1:8080"
+		req.Header.Set("User-Agent", "TestAgent")
+		req.Header.Set("x-ms-client-app-id", "TestClientAppID")
+		req.Header.Set("Region", "us-west")
+
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+		Expect(auditErr).To(BeNil())
+
+		Expect(auditEvent.Record.CallerIdentities).To(HaveKey(msgs.SubscriptionID))
+		subs := auditEvent.Record.CallerIdentities[msgs.SubscriptionID]
+		Expect(len(subs)).To(Equal(1))
+		Expect(subs[0].Identity).To(Equal("sub-123"))
+
+		Expect(auditEvent.Record.OperationAccessLevel).To(Equal("Test Access Level"))
+		Expect(auditEvent.Record.OperationName).To(Equal("GET"))
+		Expect(auditEvent.Record.OperationCategoryDescription).To(Equal("CustomDesc for GET"))
+		Expect(auditEvent.Record.OperationType).ToNot(BeNil())
+		Expect(auditEvent.Record.CallerAgent).To(Equal("TestAgent"))
+	})
+})
 
 var _ = Describe("Otel Audit Integration Test", func() {
 	var (
@@ -50,7 +107,6 @@ var _ = Describe("Otel Audit Integration Test", func() {
 		router.Use(NewOtelAuditLogging(slogLogger, otelConfig))
 		// Common simple endpoint
 		router.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
-			time.Sleep(10 * time.Millisecond)
 			w.WriteHeader(http.StatusOK)
 		})
 	})
@@ -66,7 +122,6 @@ var _ = Describe("Otel Audit Integration Test", func() {
 			router.ServeHTTP(w, req)
 
 			logOutput := buf.String()
-			Expect(logOutput).To(ContainSubstring("sending audit logs"))
 			Expect(logOutput).ToNot(ContainSubstring("failed to send audit event"))
 		})
 
@@ -160,8 +215,6 @@ var _ = Describe("Otel Audit Integration Test", func() {
 			req := httptest.NewRequest("GET", "/exclude", nil)
 			localRouter.ServeHTTP(w, req)
 
-			logOutput := buf.String()
-			Expect(logOutput).ToNot(ContainSubstring("sending audit logs"))
 			Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
 		})
 	})

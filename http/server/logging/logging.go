@@ -1,7 +1,6 @@
 package logging
 
 import (
-	"bytes"
 	"context"
 	"log/slog"
 	"net/http"
@@ -41,31 +40,25 @@ type RequestLogData struct {
 }
 
 func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	customWriter := &logging.ResponseWriter{
-		ResponseWriter: w,
-		Buf:            new(bytes.Buffer),
-	}
+	customWriter := logging.NewResponseWriter(w)
 
 	startTime := l.now()
 	ctx := r.Context()
 
 	l.LogRequestStart(ctx, r, "RequestStart")
-	l.next.ServeHTTP(customWriter, r.WithContext(ctx))
+	l.next.ServeHTTP(customWriter, r)
 	endTime := l.now()
 
 	latency := endTime.Sub(startTime)
-
-	// If error, extract the buffered response body as error message.
-	errorMsg := ""
-	if customWriter.StatusCode >= http.StatusBadRequest {
-		errorMsg = customWriter.Buf.String()
-	}
+	errorMsg := customWriter.Buf.String()
 
 	data := RequestLogData{
 		Code:     customWriter.StatusCode,
 		Duration: latency,
 		Error:    errorMsg,
 	}
+	// TODO (tomabraham): move RequestStart and RequestEnd to a different interceptor
+	// ApiRequestLog should only get "finished call" logs
 	l.LogRequestEnd(ctx, r, "RequestEnd", data)
 	l.LogRequestEnd(ctx, r, "finished call", data)
 
