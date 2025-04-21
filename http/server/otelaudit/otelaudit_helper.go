@@ -6,9 +6,11 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/Azure/aks-middleware/http/common"
+	"github.com/Azure/aks-middleware/http/common/logging"
 	"github.com/gorilla/mux"
 	"github.com/microsoft/go-otel-audit/audit"
 	"github.com/microsoft/go-otel-audit/audit/msgs"
@@ -34,6 +36,7 @@ func SendOtelAuditEvent(logger *slog.Logger, otelConfig *OtelConfig, ctx context
 	}
 
 	if shouldExclude(req, otelConfig.ExcludeAuditEvents) {
+		logger.Info(fmt.Sprintf("Exluding audit event. method: %s url: %s", req.Method, req.URL.String()))
 		return
 	}
 
@@ -84,15 +87,22 @@ func createOtelAuditEvent(logger *slog.Logger, statusCode int, req *http.Request
 		},
 	}
 
+	parsedURL, parseErr := url.Parse(req.URL.String())
+	if parseErr != nil {
+		logger.Error("error parsing request URL", "error", parseErr)
+		return msgs.Msg{}, parseErr
+	}
+	reqURL := logging.TrimURL(*parsedURL)
+	methodInfo := logging.GetMethodInfo(req.Method, reqURL)
 	record := msgs.Record{
 		CallerIpAddress:              addr,
 		CallerIdentities:             getCallerIdentities(req),
-		OperationCategories:          []msgs.OperationCategory{getOperationCategory(req.Method, otelConfig.CustomOperationCategories)},
-		OperationCategoryDescription: getOperationCategoryDescription(req.Method, otelConfig.CustomOperationDescs),
+		OperationCategories:          []msgs.OperationCategory{getOperationCategory(methodInfo, otelConfig.CustomOperationCategories)},
+		OperationCategoryDescription: getOperationCategoryDescription(methodInfo, otelConfig.CustomOperationDescs),
 		TargetResources:              tr,
 		CallerAccessLevels:           []string{"NA"},
 		OperationAccessLevel:         otelConfig.OperationAccessLevel,
-		OperationName:                req.Method,
+		OperationName:                methodInfo,
 		CallerAgent:                  req.UserAgent(),
 		OperationType:                getOperationType(req.Method),
 		OperationResult:              getOperationResult(statusCode),
@@ -110,7 +120,7 @@ func getCallerIdentities(req *http.Request) map[msgs.CallerIdentityType][]msgs.C
 
 	// Extract variables from the URL using gorilla/mux.
 	// Assuming the router pattern follows the standard Azure format:
-	// routePattern := "/{subscriptionId}/resourceGroups/{resourceGroup}/providers/{resourceProvider}/{resourceType}/{resourceName}/default"
+	// routePattern := "/{subscriptionId}/resourceGroups/{resourceGroup}/providers/{resourceProvider}/{resourceType}/{resourceName}"
 	vars := mux.Vars(req)
 
 	subscriptionID := vars[common.SubscriptionIDKey]

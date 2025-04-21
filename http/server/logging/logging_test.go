@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"time"
 
 	"github.com/Azure/aks-middleware/http/server/requestid"
 	"github.com/gorilla/mux"
@@ -37,13 +36,11 @@ var _ = Describe("Httpmw", func() {
 		router.Use(NewLogging(slogLogger))
 
 		router.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
-			time.Sleep(10 * time.Millisecond)
-			w.WriteHeader(http.StatusOK)
+			http.Error(w, "OK", http.StatusOK)
 		})
 
 		router.HandleFunc("/error", func(w http.ResponseWriter, _ *http.Request) {
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte("test error"))
+			http.Error(w, "test error", http.StatusBadRequest)
 		})
 	})
 

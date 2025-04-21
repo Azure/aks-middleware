@@ -273,16 +273,23 @@ func main() {
 ```
 
 This middleware will enrich the incoming requests with additional context and metadata, making it easier to handle and process the requests in your application.
-### 4.7 <a id='otelauditlogging'></a>otel audit logging
+### 4.7 <a id='otelauditlogging'></a>OTel Audit Logging
 
 The OTEL audit middleware is designed to provide a unified way of logging security events for all Azure internal services. It acts as a logging client that sends logs to a Unix domain socket or TCP connection, eliminating the need for specific knowledge of Azure environments, Geneva accounts, namespaces, endpoints, and certificates. The middleware relies on the Geneva Agent (mdsd) to push logs to the Geneva backend.
 
 It is based off of the go otel audit framework here: https://github.com/microsoft/go-otel-audit
 
 Key Features:
-- Unified Logging: The middleware provides a generic way to record every operation made using an OTEL client.
-- Security and Compliance: Audit logs are essential for meeting security needs, customer expectations, and compliance requirements for standards such as FISMA/FedRAMP, EU Model Clauses, and ISO 270013.
-- Middleware Implementation: The middleware includes a function that takes care of sending the audit logs, and the mw gathers other information by inspecting request/response elements. It also allows consumers to pass their own operation category descriptions .
+- **Unified Logging**: The middleware provides a generic way to record every operation made using an OTEL client.
+- **Security and Compliance**: Audit logs are essential for meeting security needs, customer expectations, and compliance requirements for standards such as FISMA/FedRAMP, EU Model Clauses, and ISO 270013.
+- **Middleware Implementation**: The middleware includes a function that takes care of sending the audit logs, and the mw gathers other information by inspecting request/response elements. 
+- **Customization**:  Consumers can pass their own configuration to customize the audit logging further. Available options include:
+  - **CustomOperationDescs** (map[string]string): Custom descriptions for different operations. Key must match what is returned by GetMethodInfo() for the given URL
+  - **CustomOperationCategories** (map[string]msgs.OperationCategory): Custom mappings for operation categories. Key must match what is returned by GetMethodInfo() for the given URL
+  - **OperationAccessLevel:** The access level for the operation.
+  - **ExcludeAuditEvents:** A map of HTTP methods to URL substrings; if a request URL contains any of these substrings for the given method, the audit event is excluded.
+
+Usage examples included in test code
 
 ## 5. <a id='HTTPclientviaAzureSDK'></a>HTTP client via Azure SDK
 
