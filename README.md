@@ -282,7 +282,11 @@ It is based off of the go otel audit framework here: https://github.com/microsof
 Key Features:
 - **Unified Logging**: The middleware provides a generic way to record every operation made using an OTEL client.
 - **Security and Compliance**: Audit logs are essential for meeting security needs, customer expectations, and compliance requirements for standards such as FISMA/FedRAMP, EU Model Clauses, and ISO 270013.
-- **Middleware Implementation**: The middleware includes a function that takes care of sending the audit logs, and the mw gathers other information by inspecting request/response elements. 
+- **Middleware Implementation**: The middleware includes a function that takes care of sending the audit logs, and the mw gathers other information by inspecting request/response elements. The URLs must follow the general Azure Resource Manager pattern so the necessary information can be extracted from the URL
+    - ````go
+      routePattern := "/{subscriptionId}/resourceGroups/{resourceGroup}/providers/{resourceProvider}/{resourceType}/{resourceName}"
+      ````
+
 - **Customization**:  Consumers can pass their own configuration to customize the audit logging further. Available options include:
   - **CustomOperationDescs** (map[string]string): Custom descriptions for different operations. Key must match what is returned by GetMethodInfo() for the given URL
   - **CustomOperationCategories** (map[string]msgs.OperationCategory): Custom mappings for operation categories. Key must match what is returned by GetMethodInfo() for the given URL
