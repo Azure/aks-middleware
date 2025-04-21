@@ -1,6 +1,7 @@
 package logging
 
 import (
+    "bytes"
     "log/slog"
     "net/http"
     "net/url"
@@ -8,8 +9,8 @@ import (
     "time"
 
     "github.com/Azure/aks-middleware/http/common"
-    azcorePolicy "github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
     "github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
+    azcorePolicy "github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 )
 
 type LogRequestParams struct {
@@ -38,11 +39,11 @@ func sanitizeResourceType(rt string, rawURL string) string {
         rt = rt[:idx]
     }
     rt = strings.ToLower(rt)
-    
+
     return rt
 }
 
-func getMethodInfo(method string, rawURL string) string {
+func GetMethodInfo(method string, rawURL string) string {
     // Trim the URL to ensure it starts with "/subscriptions"
     validURL := trimToSubscription(rawURL)
 
@@ -50,7 +51,7 @@ func getMethodInfo(method string, rawURL string) string {
     id, err := arm.ParseResourceID(validURL)
     if err != nil {
         // Retry by appending a false resource name ("dummy")
-		// To be a valid resource ID, the URL must end with the resource name.
+        // To be a valid resource ID, the URL must end with the resource name.
         fakeURL := validURL
         if !strings.HasSuffix(validURL, "/dummy") {
             fakeURL = validURL + "/dummy"
@@ -79,7 +80,7 @@ func getMethodInfo(method string, rawURL string) string {
     return method + " " + sanitizeResourceType(id.ResourceType.String(), rawURL)
 }
 
-func trimURL(parsedURL url.URL) string {
+func TrimURL(parsedURL url.URL) string {
     // Extract the `api-version` parameter
     apiVersion := parsedURL.Query().Get("api-version")
 
@@ -122,10 +123,10 @@ func LogRequest(params LogRequestParams) {
             "error", parseErr.Error(),
         ).Error("error parsing request URL")
     } else {
-        reqURL = trimURL(*parsedURL)
+        reqURL = TrimURL(*parsedURL)
     }
 
-    methodInfo := getMethodInfo(method, reqURL)
+    methodInfo := GetMethodInfo(method, reqURL)
     latency := time.Since(params.StartTime).Milliseconds()
 
     var headers map[string]string
@@ -178,4 +179,37 @@ func extractHeaders(header http.Header) map[string]string {
     }
 
     return headers
+}
+
+// ResponseWriter is a custom response writer that buffers the response body and tracks the status code.
+type ResponseWriter struct {
+    http.ResponseWriter
+    StatusCode int
+    Buf        *bytes.Buffer
+}
+
+func NewResponseWriter(w http.ResponseWriter) *ResponseWriter {
+    return &ResponseWriter{
+        ResponseWriter: w,
+        Buf:            new(bytes.Buffer),
+    }
+}
+
+func (w *ResponseWriter) WriteHeader(code int) {
+    w.StatusCode = code
+    w.ResponseWriter.WriteHeader(code)
+}
+
+func (w *ResponseWriter) Write(b []byte) (int, error) {
+    if w.StatusCode == 0 {
+        w.StatusCode = http.StatusOK
+    }
+    if w.StatusCode >= http.StatusBadRequest {
+        if w.Buf == nil {
+            w.Buf = new(bytes.Buffer)
+        }
+        // Write only if status code indicates error
+        w.Buf.Write(b)
+    }
+    return w.ResponseWriter.Write(b)
 }

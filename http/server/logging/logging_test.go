@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"time"
 
 	"github.com/Azure/aks-middleware/http/server/requestid"
 	"github.com/gorilla/mux"
@@ -37,8 +36,11 @@ var _ = Describe("Httpmw", func() {
 		router.Use(NewLogging(slogLogger))
 
 		router.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
-			time.Sleep(10 * time.Millisecond)
-			w.WriteHeader(http.StatusOK)
+			http.Error(w, "OK", http.StatusOK)
+		})
+
+		router.HandleFunc("/error", func(w http.ResponseWriter, _ *http.Request) {
+			http.Error(w, "test error", http.StatusBadRequest)
 		})
 	})
 
@@ -72,6 +74,18 @@ var _ = Describe("Httpmw", func() {
 			Expect(buf.String()).To(ContainSubstring(`"correlationid":"test-correlation-id"`))
 			Expect(buf.String()).ToNot(ContainSubstring(`"armclientrequestid"`))
 			Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
+		})
+
+		It("should capture error message for error responses", func() {
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest("GET", "/error", nil)
+
+			router.ServeHTTP(w, req)
+
+			Expect(buf.String()).To(ContainSubstring("finished call"))
+			Expect(buf.String()).To(ContainSubstring(`"code":400`))
+			Expect(buf.String()).To(ContainSubstring("test error"))
+			Expect(w.Result().StatusCode).To(Equal(http.StatusBadRequest))
 		})
 	})
 })
