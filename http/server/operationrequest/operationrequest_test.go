@@ -14,7 +14,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("OperationRequest", func() {
+var _ = Describe("OperationRequest Tests", func() {
 	var (
 		req      *http.Request
 		router   *mux.Router
@@ -34,7 +34,7 @@ var _ = Describe("OperationRequest", func() {
 		// setup a router for matching URL variables
 		router = mux.NewRouter()
 		routePattern := "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/{resourceProvider}/{resourceType}/{resourceName}/default"
-		validURL = "/subscriptions/sub3/resourceGroups/rg3/providers/Microsoft.Test/resourceType1/resourceName1/default?api-version=2021-12-01"
+		validURL = "/subscriptions/sub3/resourceGroups/rg3/providers/Microsoft.Test/resourceType1/resourceName1/default?api-version=2021-12-01-Preview"
 		router.HandleFunc(routePattern, func(w http.ResponseWriter, r *http.Request) {})
 	})
 
@@ -66,12 +66,12 @@ var _ = Describe("OperationRequest", func() {
 			op, err := NewBaseOperationRequest(req, "region-test", defaultOpts)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(op).NotTo(BeNil())
-			Expect(op.APIVersion).To(Equal("2021-12-01"))
+			Expect(op.APIVersion).To(Equal("2021-12-01-preview"))
 			Expect(op.SubscriptionID).To(Equal("sub3"))
 			Expect(op.ResourceGroup).To(Equal("rg3"))
 			Expect(op.CorrelationID).To(Equal("corr-test"))
 			Expect(op.HttpMethod).To(Equal(http.MethodPost))
-			Expect(op.TargetURI).To(ContainSubstring("api-version=2021-12-01"))
+			Expect(op.TargetURI).To(ContainSubstring("api-version=2021-12-01-Preview"))
 			Expect(strings.ToLower(op.AcceptedLanguage)).To(Equal("en-gb"))
 			Expect(bytes.Equal(op.Body, []byte(payload))).To(BeTrue())
 			Expect(op.OperationID).NotTo(BeEmpty())
@@ -127,7 +127,7 @@ var _ = Describe("OperationRequest", func() {
 				Expect(op.Extras["MyCustomHeader"]).To(Equal("header-value"))
 
 				// Verify extracted fields remain unchanged.
-				Expect(op.APIVersion).To(Equal("2021-12-01"))
+				Expect(op.APIVersion).To(Equal("2021-12-01-preview"))
 				Expect(op.SubscriptionID).To(Equal("sub3"))
 				Expect(op.ResourceGroup).To(Equal("rg3"))
 				Expect(op.ResourceType).To(Equal("Microsoft.Test/resourceType1"))
