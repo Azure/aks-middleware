@@ -14,7 +14,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("OperationRequest", func() {
+var _ = Describe("OperationRequest Tests", func() {
 	var (
 		req      *http.Request
 		router   *mux.Router

@@ -169,6 +169,7 @@ func FilteredOperationRequestMap(op *BaseOperationRequest, opFields []string) ma
 	return filtered
 }
 
+// standardize any fields on operation request as needed
 func standardize(op *BaseOperationRequest) {
 	op.APIVersion = strings.ToLower(op.APIVersion)
 	op.AcceptedLanguage = strings.ToLower(op.AcceptedLanguage)
