@@ -33,7 +33,7 @@ var _ = Describe("OperationRequest Tests", func() {
 	BeforeEach(func() {
 		// setup a router for matching URL variables
 		router = mux.NewRouter()
-		routePattern := "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/{resourceProvider}/{resourceType}/{resourceName}/default"
+		routePattern := "/subscriptions/{subscriptionID}/resourceGroups/{resourceGroup}/providers/{resourceProvider}/{resourceType}/{resourceName}/default"
 		validURL = "/subscriptions/sub3/resourceGroups/rg3/providers/Microsoft.Test/resourceType1/resourceName1/default?api-version=2021-12-01-Preview"
 		router.HandleFunc(routePattern, func(w http.ResponseWriter, r *http.Request) {})
 	})

@@ -1,16 +1,16 @@
 package operationrequest
 
 import (
-    "encoding/json"
-    "io"
-    "net/http"
-    "net/http/httptest"
-    "strings"
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 
-    "github.com/Azure/aks-middleware/http/common"
-    "github.com/gorilla/mux"
-    . "github.com/onsi/ginkgo/v2"
-    . "github.com/onsi/gomega"
+	"github.com/Azure/aks-middleware/http/common"
+	"github.com/gorilla/mux"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("OperationRequest Context Examination Integration", func() {
@@ -41,7 +41,7 @@ var _ = Describe("OperationRequest Context Examination Integration", func() {
         opRouter := router.PathPrefix("/subscriptions").Subrouter()
         // Attach the OperationRequest middleware only to this subrouter.
         opRouter.Use(NewOperationRequest("region-test", defaultOpts))
-        routePattern := "/{subscriptionId}/resourceGroups/{resourceGroup}/providers/{resourceProvider}/{resourceType}/{resourceName}/default"
+        routePattern := "/{subscriptionID}/resourceGroups/{resourceGroup}/providers/{resourceProvider}/{resourceType}/{resourceName}/default"
         validOpURL = "/subscriptions/sub3/resourceGroups/rg3/providers/Microsoft.Test/resourceType1/resourceName1/default?api-version=2021-12-01"
         finalHandler := func(w http.ResponseWriter, r *http.Request) {
             op := OperationRequestFromContext(r.Context())

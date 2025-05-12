@@ -235,7 +235,7 @@ This ensures that each request has a unique `OperationID`, either supplied by th
 
 This middleware is intended to be used by RPs that whose URLs follow the below pattern:
 ```go
-        routePattern := "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/{resourceProvider}/{resourceType}/{resourceName}/default?api-version=XXXX-XX-XX"
+        routePattern := "/subscriptions/{subscriptionID}/resourceGroups/{resourceGroup}/providers/{resourceProvider}/{resourceType}/{resourceName}/default?api-version=XXXX-XX-XX"
 
 ```
 
@@ -284,7 +284,7 @@ Key Features:
 - **Security and Compliance**: Audit logs are essential for meeting security needs, customer expectations, and compliance requirements for standards such as FISMA/FedRAMP, EU Model Clauses, and ISO 270013.
 - **Middleware Implementation**: The middleware includes a function that takes care of sending the audit logs, and the mw gathers other information by inspecting request/response elements. The URLs must follow the general Azure Resource Manager pattern so the necessary information can be extracted from the URL
     - ````go
-      routePattern := "/{subscriptionId}/resourceGroups/{resourceGroup}/providers/{resourceProvider}/{resourceType}/{resourceName}"
+      routePattern := "/{subscriptionID}/resourceGroups/{resourceGroup}/providers/{resourceProvider}/{resourceType}/{resourceName}"
       ````
 
 - **Customization**:  Consumers can pass their own configuration to customize the audit logging further. Available options include:

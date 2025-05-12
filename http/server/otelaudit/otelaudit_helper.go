@@ -120,7 +120,7 @@ func getCallerIdentities(req *http.Request) map[msgs.CallerIdentityType][]msgs.C
 
 	// Extract variables from the URL using gorilla/mux.
 	// Assuming the router pattern follows the standard Azure format:
-	// routePattern := "/{subscriptionId}/resourceGroups/{resourceGroup}/providers/{resourceProvider}/{resourceType}/{resourceName}"
+	// routePattern := "/{subscriptionID}/resourceGroups/{resourceGroup}/providers/{resourceProvider}/{resourceType}/{resourceName}"
 	vars := mux.Vars(req)
 
 	subscriptionID := vars[common.SubscriptionIDKey]

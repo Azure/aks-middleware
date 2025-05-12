@@ -20,7 +20,7 @@ const (
 )
 
 const (
-    SubscriptionIDKey   = "subscriptionId"
+    SubscriptionIDKey   = "subscriptionID"
     ResourceGroupKey    = "resourceGroup"
     APIVersionKey       = "api-version"
     ResourceProviderKey = "resourceProvider"
