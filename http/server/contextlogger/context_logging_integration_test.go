@@ -69,7 +69,7 @@ var _ = Describe("OperationRequest and ContextLogger Integration", func() {
 		// relevant informaiton for all routes
 		subRouter.Use(opreq.NewOperationRequest("test-region", defaultOpts))
 		// Then add logging interceptor to capture op request details from the context.
-		subRouter.Use(New(*logger, func(ctx context.Context, r *http.Request) map[string]interface{} {
+		subRouter.Use(New(*logger, func(ctx context.Context, r *http.Request, w ResponseRecord) map[string]interface{} {
 			op := opreq.OperationRequestFromContext(ctx)
 			if op == nil {
 				return nil

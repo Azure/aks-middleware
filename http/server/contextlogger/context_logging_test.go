@@ -17,7 +17,7 @@ import (
 type routerConfig struct {
 	buf         *bytes.Buffer
 	logger      *slog.Logger
-	extractFunc func(ctx context.Context, r *http.Request) map[string]interface{}
+	extractFunc ExtractFunction
 }
 
 const (
@@ -50,12 +50,20 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 				extractFunc: nil,
 			},
 			extraLoggingVariablesName: {
-				extractFunc: func(ctx context.Context, r *http.Request) map[string]interface{} {
+				extractFunc: func(ctx context.Context, r *http.Request, w ResponseRecord) map[string]interface{} {
 					attrs := make(map[string]interface{})
 					attrs[subscriptionIDKey] = "extractedSubIDvalue"
 					attrs[resourceGroupNameKey] = "extractedRGnamevalue"
-					attrs[resultTypeKey] = 3
+
 					attrs[errorDetailsKey] = "extractedErrorDetailsvalue"
+
+					if w.status < 400 {
+						attrs[resultTypeKey] = 0
+					} else if w.status < 500 {
+						attrs[resultTypeKey] = 1
+					} else {
+						attrs[resultTypeKey] = 2
+					}
 					return attrs
 				},
 			},
@@ -129,6 +137,7 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 		Expect(out).To(ContainSubstring(fmt.Sprintf(`"%s":"extractedSubIDvalue"`, subscriptionIDKey)))
 		Expect(out).To(ContainSubstring(fmt.Sprintf(`"%s":%d`, resultTypeKey, 3)))
 		Expect(out).To(ContainSubstring(fmt.Sprintf(`"%s":"extractedErrorDetailsvalue"`, errorDetailsKey)))
+		Expect(out).To(ContainSubstring(fmt.Sprintf(`"%s":"0"`, resultTypeKey)))
 		Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
 	})
 

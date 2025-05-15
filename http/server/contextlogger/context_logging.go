@@ -10,9 +10,29 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
+// responseRecord be used to record http response's status and content length,
+type ResponseRecord struct {
+	http.ResponseWriter
+	status int
+	size   int
+}
+
+var _ http.ResponseWriter = &ResponseRecord{}
+
+func (r ResponseRecord) WriteHeader(status int) {
+	r.status = status
+	r.ResponseWriter.WriteHeader(status)
+}
+
+func (r ResponseRecord) Write(b []byte) (int, error) {
+	s, err := r.ResponseWriter.Write(b)
+	r.size += s
+	return s, err
+}
+
 type loggerKeyType string
 
-type ExtractFunction func(ctx context.Context, r *http.Request) map[string]interface{}
+type ExtractFunction func(ctx context.Context, r *http.Request, w ResponseRecord) map[string]interface{}
 
 const (
 	ctxLogSource               = "CtxLog"
@@ -21,7 +41,7 @@ const (
 
 // DefaultExtractor extracts operation request fields from the context.
 // It returns the filtered map containing only the specified keys.
-func DefaultExtractor(ctx context.Context, r *http.Request) map[string]interface{} {
+func DefaultExtractor(ctx context.Context, r *http.Request, w ResponseRecord) map[string]interface{} {
 	op := opreq.OperationRequestFromContext(ctx)
 	if op == nil {
 		return nil
@@ -61,15 +81,18 @@ type contextLogMiddleware struct {
 
 func (m *contextLogMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	attributes := BuildAttributes(ctx, r, m.extractFunction)
+	responseRecord := ResponseRecord{
+		ResponseWriter: w,
+	}
+
+	m.next.ServeHTTP(responseRecord, r)
+	attributes := BuildAttributes(ctx, r, responseRecord, m.extractFunction)
 	contextLogger := m.logger.With(attributes...)
 	ctx = context.WithValue(ctx, ctxLoggerKey, contextLogger)
 	r = r.WithContext(ctx)
-
-	m.next.ServeHTTP(w, r)
 }
 
-func BuildAttributes(ctx context.Context, r *http.Request, extractFunc func(ctx context.Context, r *http.Request) map[string]interface{}) []interface{} {
+func BuildAttributes(ctx context.Context, r *http.Request, w ResponseRecord, extractFunc ExtractFunction) []interface{} {
 	md, ok := metadata.FromIncomingContext(ctx)
 	headers := make(map[string]string)
 	if ok {
@@ -85,7 +108,7 @@ func BuildAttributes(ctx context.Context, r *http.Request, extractFunc func(ctx 
 
 	// Use the extract function to get additional attributes.
 	if extractFunc != nil {
-		extractedAttrs := extractFunc(ctx, r)
+		extractedAttrs := extractFunc(ctx, r, w)
 		for k, v := range extractedAttrs {
 			logAttrs[k] = v
 		}
