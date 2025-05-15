@@ -19,12 +19,12 @@ type ResponseRecord struct {
 
 var _ http.ResponseWriter = &ResponseRecord{}
 
-func (r ResponseRecord) WriteHeader(status int) {
+func (r *ResponseRecord) WriteHeader(status int) {
 	r.status = status
 	r.ResponseWriter.WriteHeader(status)
 }
 
-func (r ResponseRecord) Write(b []byte) (int, error) {
+func (r *ResponseRecord) Write(b []byte) (int, error) {
 	s, err := r.ResponseWriter.Write(b)
 	r.size += s
 	return s, err
@@ -32,7 +32,7 @@ func (r ResponseRecord) Write(b []byte) (int, error) {
 
 type loggerKeyType string
 
-type ExtractFunction func(ctx context.Context, r *http.Request, w ResponseRecord) map[string]interface{}
+type ExtractFunction func(ctx context.Context, r *http.Request, w *ResponseRecord) map[string]interface{}
 
 const (
 	ctxLogSource               = "CtxLog"
@@ -41,7 +41,7 @@ const (
 
 // DefaultExtractor extracts operation request fields from the context.
 // It returns the filtered map containing only the specified keys.
-func DefaultExtractor(ctx context.Context, r *http.Request, w ResponseRecord) map[string]interface{} {
+func DefaultExtractor(ctx context.Context, r *http.Request, w *ResponseRecord) map[string]interface{} {
 	op := opreq.OperationRequestFromContext(ctx)
 	if op == nil {
 		return nil
@@ -81,7 +81,7 @@ type contextLogMiddleware struct {
 
 func (m *contextLogMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	responseRecord := ResponseRecord{
+	responseRecord := &ResponseRecord{
 		ResponseWriter: w,
 	}
 
@@ -92,7 +92,7 @@ func (m *contextLogMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	r = r.WithContext(ctx)
 }
 
-func BuildAttributes(ctx context.Context, r *http.Request, w ResponseRecord, extractFunc ExtractFunction) []interface{} {
+func BuildAttributes(ctx context.Context, r *http.Request, w *ResponseRecord, extractFunc ExtractFunction) []interface{} {
 	md, ok := metadata.FromIncomingContext(ctx)
 	headers := make(map[string]string)
 	if ok {

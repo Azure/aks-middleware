@@ -50,7 +50,7 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 				extractFunc: nil,
 			},
 			extraLoggingVariablesName: {
-				extractFunc: func(ctx context.Context, r *http.Request, w ResponseRecord) map[string]interface{} {
+				extractFunc: func(ctx context.Context, r *http.Request, w *ResponseRecord) map[string]interface{} {
 					attrs := make(map[string]interface{})
 					attrs[subscriptionIDKey] = "extractedSubIDvalue"
 					attrs[resourceGroupNameKey] = "extractedRGnamevalue"
@@ -111,8 +111,6 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 		routersMap[defaultRouterName].ServeHTTP(w, req)
 
 		out := routerConfigs[defaultRouterName].buf.String()
-		fmt.Println("Default router output:")
-		fmt.Println(out)
 		Expect(out).To(ContainSubstring(`"source":"CtxLog"`))
 		Expect(out).To(ContainSubstring(`"method":"GET"`))
 		Expect(out).To(ContainSubstring("test log message"))
