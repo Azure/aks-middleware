@@ -116,3 +116,7 @@ func GetLogger(ctx context.Context) *slog.Logger {
 	}
 	return logger
 }
+
+func WithLogger(ctx context.Context, logger *slog.Logger) context.Context {
+	return context.WithValue(ctx, ctxLoggerKey, logger)
+}
