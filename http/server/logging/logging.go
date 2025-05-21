@@ -71,7 +71,7 @@ func BuildAttributes(ctx context.Context, r *http.Request, extra ...interface{})
 		"protocol", "HTTP",
 		"method_type", "unary",
 		"component", "server",
-		"method", r.Method,
+		"method", logging.GetMethodInfo(r.Method, r.URL.Path),
 		"service", r.Host,
 		"url", r.URL.String(),
 	}
