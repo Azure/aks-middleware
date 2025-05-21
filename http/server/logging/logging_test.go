@@ -39,6 +39,10 @@ var _ = Describe("Httpmw", func() {
 			http.Error(w, "OK", http.StatusOK)
 		})
 
+		router.HandleFunc("/subscriptions/sub_id/resourceGroups/rg_name/providers/Microsoft.Storage/storageAccounts", func(w http.ResponseWriter, _ *http.Request) {
+			http.Error(w, "OK", http.StatusOK)
+		})
+
 		router.HandleFunc("/error", func(w http.ResponseWriter, _ *http.Request) {
 			http.Error(w, "test error", http.StatusBadRequest)
 		})
@@ -47,13 +51,14 @@ var _ = Describe("Httpmw", func() {
 	Describe("LoggingMiddleware", func() {
 		It("should log and return OK status", func() {
 			w := httptest.NewRecorder()
-			req := httptest.NewRequest("GET", "/", nil)
+			req := httptest.NewRequest("GET", "/subscriptions/sub_id/resourceGroups/rg_name/providers/Microsoft.Storage/storageAccounts?api-version=version&param1=value1&param2=value2", nil)
 
 			router.ServeHTTP(w, req)
 
 			Expect(buf.String()).To(ContainSubstring("finished call"))
 			Expect(buf.String()).To(ContainSubstring(`"source":"ApiRequestLog"`))
 			Expect(buf.String()).To(ContainSubstring(`"protocol":"HTTP"`))
+			Expect(buf.String()).To(ContainSubstring(`"method":"GET storageaccounts - LIST"`))
 			Expect(buf.String()).To(ContainSubstring(`"method_type":"unary"`))
 			Expect(buf.String()).To(ContainSubstring(`"component":"server"`))
 			Expect(buf.String()).To(ContainSubstring(`"time_ms":`))
