@@ -10,13 +10,16 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-type loggerKeyType string
+type loggerKeyType struct{}
 
 type ExtractFunction func(ctx context.Context, r *http.Request) map[string]interface{}
 
 const (
-	ctxLogSource               = "CtxLog"
-	ctxLoggerKey loggerKeyType = "CtxLogKey"
+	ctxLogSource = "CtxLog"
+)
+
+var (
+	ctxLoggerKey = loggerKeyType{}
 )
 
 // DefaultExtractor extracts operation request fields from the context.
@@ -115,4 +118,8 @@ func GetLogger(ctx context.Context) *slog.Logger {
 		return ctxlogger
 	}
 	return logger
+}
+
+func WithLogger(ctx context.Context, logger *slog.Logger) context.Context {
+	return context.WithValue(ctx, ctxLoggerKey, logger)
 }
