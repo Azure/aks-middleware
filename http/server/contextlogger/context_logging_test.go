@@ -144,7 +144,7 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 		Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
 	})
 
-	It("Should be able to retrieve the logger already set in context with WithLogger()", func() {
+	It("Should be able to retrieve the logger already set in context with GetLogger()", func() {
 		expectedLogger := slog.New(slog.NewTextHandler(io.Discard, nil))
 		ctx := context.WithValue(context.Background(), ctxLoggerKey, expectedLogger)
 
