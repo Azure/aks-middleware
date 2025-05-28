@@ -146,8 +146,7 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 
 	It("Should be able to retrieve the logger already set in context with GetLogger()", func() {
 		expectedLogger := slog.New(slog.NewTextHandler(io.Discard, nil))
-		ctx := context.WithValue(context.Background(), loggerKey, expectedLogger)
-
+		ctx := WithLogger(context.Background(), expectedLogger)
 		gotLogger := GetLogger(ctx)
 
 		Expect(gotLogger).To(Equal(expectedLogger), "expected logger from context, got a different instance")
