@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -103,8 +104,6 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 		routersMap[defaultRouterName].ServeHTTP(w, req)
 
 		out := routerConfigs[defaultRouterName].buf.String()
-		fmt.Println("Default router output:")
-		fmt.Println(out)
 		Expect(out).To(ContainSubstring(`"source":"CtxLog"`))
 		Expect(out).To(ContainSubstring(`"method":"GET"`))
 		Expect(out).To(ContainSubstring("test log message"))
@@ -143,5 +142,13 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 		Expect(out).To(ContainSubstring(`"method":"GET"`))
 		Expect(out).To(ContainSubstring(fmt.Sprintf(`"%s":"%s"`, customTestKey, customTestValue)))
 		Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
+	})
+
+	It("Should be able to retrieve the logger already set in context with GetLogger()", func() {
+		expectedLogger := slog.New(slog.NewTextHandler(io.Discard, nil))
+		ctx := WithLogger(context.Background(), expectedLogger)
+		gotLogger := GetLogger(ctx)
+
+		Expect(gotLogger).To(Equal(expectedLogger), "expected logger from context, got a different instance")
 	})
 })
