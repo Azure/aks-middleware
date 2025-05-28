@@ -2,7 +2,7 @@ package contextlogger
 
 import (
 	"context"
-	"log/slog"
+	log "log/slog"
 	"net/http"
 
 	opreq "github.com/Azure/aks-middleware/http/server/operationrequest"
@@ -19,7 +19,7 @@ const (
 )
 
 var (
-	ctxLoggerKey = loggerKeyType{}
+	loggerKey = loggerKeyType{}
 )
 
 // DefaultExtractor extracts operation request fields from the context.
@@ -40,7 +40,7 @@ func DefaultExtractor(ctx context.Context, r *http.Request) map[string]interface
 //
 //	logger:                  A slog.Logger instance used for logging. Any static attributes added to this logger before passing it in will be preserved
 //	extractFunction:         ExtractFunction extracts information from the ctx and/or the request and put it in the logger
-func New(logger slog.Logger, extractFunction ExtractFunction) mux.MiddlewareFunc {
+func New(logger log.Logger, extractFunction ExtractFunction) mux.MiddlewareFunc {
 	if extractFunction == nil {
 		extractFunction = DefaultExtractor
 	}
@@ -58,7 +58,7 @@ var _ http.Handler = &contextLogMiddleware{}
 
 type contextLogMiddleware struct {
 	next            http.Handler
-	logger          slog.Logger
+	logger          log.Logger
 	extractFunction ExtractFunction
 }
 
@@ -66,7 +66,7 @@ func (m *contextLogMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	ctx := r.Context()
 	attributes := BuildAttributes(ctx, r, m.extractFunction)
 	contextLogger := m.logger.With(attributes...)
-	ctx = context.WithValue(ctx, ctxLoggerKey, contextLogger)
+	ctx = context.WithValue(ctx, loggerKey, contextLogger)
 	r = r.WithContext(ctx)
 
 	m.next.ServeHTTP(w, r)
@@ -109,17 +109,17 @@ func defaultCtxLogAttributes(r *http.Request) []interface{} {
 	}
 }
 
-func GetLogger(ctx context.Context) *slog.Logger {
-	logger := slog.Default().With("src", "self gen, not available in ctx")
+func GetLogger(ctx context.Context) *log.Logger {
+	logger := log.Default().With("src", "self gen, not available in ctx")
 	if ctx == nil {
 		return logger
 	}
-	if ctxlogger, ok := ctx.Value(ctxLoggerKey).(*slog.Logger); ok {
+	if ctxlogger, ok := ctx.Value(loggerKey).(*log.Logger); ok {
 		return ctxlogger
 	}
 	return logger
 }
 
-func WithLogger(ctx context.Context, logger *slog.Logger) context.Context {
-	return context.WithValue(ctx, ctxLoggerKey, logger)
+func WithLogger(ctx context.Context, logger *log.Logger) context.Context {
+	return context.WithValue(ctx, loggerKey, logger)
 }
