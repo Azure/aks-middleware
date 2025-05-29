@@ -2,6 +2,8 @@ package contextlogger
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	log "log/slog"
 	"net/http"
 
@@ -64,7 +66,12 @@ type contextLogMiddleware struct {
 
 func (m *contextLogMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	attributes := BuildAttributes(ctx, r, m.extractFunction)
+	attributes, err := BuildAttributes(ctx, r, m.extractFunction)
+	if err != nil {
+		errStr := fmt.Sprintf("failed to marshal attributes: %s", err)
+		log.Default().With("src", "error in context logging middleware").Error(errStr)
+		http.Error(w, "Failed to marshal attributes for context logger", http.StatusInternalServerError) //TODO: do we error if we can't log? should be caught in e2e
+	}
 	contextLogger := m.logger.With(attributes...)
 	ctx = context.WithValue(ctx, loggerKey, contextLogger)
 	r = r.WithContext(ctx)
@@ -72,7 +79,7 @@ func (m *contextLogMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	m.next.ServeHTTP(w, r)
 }
 
-func BuildAttributes(ctx context.Context, r *http.Request, extractFunc func(ctx context.Context, r *http.Request) map[string]interface{}) []interface{} {
+func BuildAttributes(ctx context.Context, r *http.Request, extractFunc func(ctx context.Context, r *http.Request) map[string]interface{}) ([]interface{}, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
 	headers := make(map[string]string)
 	if ok {
@@ -94,11 +101,16 @@ func BuildAttributes(ctx context.Context, r *http.Request, extractFunc func(ctx 
 		}
 	}
 
+	attrBytes, err := json.Marshal(logAttrs)
+	if err != nil {
+		return nil, err
+	}
+	attributesStr := string(attrBytes)
 	// Include metadata headers as part of the attributes.
-	attributes = append(attributes, "log", logAttrs)
+	attributes = append(attributes, "log", attributesStr)
 	// grab desired headers from the request (based on extraction function passed to request ID middleware)
 	attributes = append(attributes, "headers", headers)
-	return attributes
+	return attributes, nil
 }
 
 func defaultCtxLogAttributes(r *http.Request) []interface{} {
