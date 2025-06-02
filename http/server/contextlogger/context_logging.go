@@ -106,10 +106,17 @@ func BuildAttributes(ctx context.Context, r *http.Request, extractFunc func(ctx 
 		return nil, err
 	}
 	attributesStr := string(attrBytes)
+
+	headerBytes, err := json.Marshal(headers)
+	if err != nil {
+		return nil, err
+	}
+	headersStr := string(headerBytes)
+
 	// Include metadata headers as part of the attributes.
 	attributes = append(attributes, "log", attributesStr)
 	// grab desired headers from the request (based on extraction function passed to request ID middleware)
-	attributes = append(attributes, "headers", headers)
+	attributes = append(attributes, "headers", headersStr)
 	return attributes, nil
 }
 
