@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 
 	"github.com/Azure/aks-middleware/http/server/requestid"
 	"github.com/gorilla/mux"
@@ -139,12 +140,20 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 		routersMap[extraLoggingVariablesName].ServeHTTP(w, req)
 
 		out := routerConfigs[extraLoggingVariablesName].buf.String()
-		logInfo, err := getLogString(out)
+		logInfo, err := unmarshalLog(out)
 		Expect(err).NotTo(HaveOccurred(), "failed to parse log string")
 
-		// Check values from requestIDExtractor.
-		Expect(out).To(ContainSubstring(`"operationid":"test-operation-id"`))
-		Expect(out).To(ContainSubstring(`"correlationid":"test-correlation-id"`))
+		lines := strings.Split(out, "\n")
+		var headersMap map[string]interface{}
+		for _, line := range lines {
+			if strings.Contains(line, `"headers"`) {
+				headersMap, err = unmarshalHeaders(line)
+				Expect(err).ToNot(HaveOccurred(), "failed to unmarshal headers from log output")
+				break
+			}
+		}
+		Expect(headersMap["operationid"]).To(Equal("test-operation-id"))
+		Expect(headersMap["correlationid"]).To(Equal("test-correlation-id"))
 		// Verify extra extracted attributes appear.
 		Expect(logInfo[resourceGroupNameKey]).To(Equal("extractedRGnamevalue"))
 		Expect(logInfo[subscriptionIDKey]).To(Equal("extractedSubIDvalue"))
@@ -163,7 +172,7 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 		routersMap[extraLoggingCannotMarshal].ServeHTTP(w, req)
 
 		out := routerConfigs[extraLoggingCannotMarshal].buf.String()
-		_, err := getLogString(out)
+		_, err := unmarshalLog(out)
 		Expect(err).To(HaveOccurred(), "failed to parse log string")
 	})
 
@@ -189,7 +198,7 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 	})
 })
 
-func getLogString(out string) (map[string]interface{}, error) {
+func unmarshalLog(out string) (map[string]interface{}, error) {
 	var outer map[string]interface{}
 	if err := json.Unmarshal([]byte(out), &outer); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal log output: %w", err)
@@ -202,6 +211,27 @@ func getLogString(out string) (map[string]interface{}, error) {
 	err := json.Unmarshal([]byte(logStr), &inner)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal log string: %w", err)
+	}
+	return inner, nil
+}
+
+func unmarshalHeaders(log string) (map[string]interface{}, error) {
+	fmt.Println("headers to unmarshal: ", log)
+	var outer map[string]interface{}
+	if err := json.Unmarshal([]byte(log), &outer); err != nil {
+		fmt.Println("failed here==")
+		return nil, fmt.Errorf("failed to unmarshal headers log output: %w", err)
+	}
+	headersStr, ok := outer["headers"]
+	if !ok {
+		return nil, fmt.Errorf("headers key not found or not a string in log output")
+	}
+	var inner map[string]interface{}
+	err := json.Unmarshal([]byte(headersStr.(string)), &inner)
+	if err != nil {
+		fmt.Println("failed here 2==")
+
+		return nil, fmt.Errorf("failed to unmarshal headers log string: %w", err)
 	}
 	return inner, nil
 }

@@ -148,7 +148,11 @@ Code example is included in the test code.
 
 ### 4.3. <a id='httpctxlogger'></a>ctx logging (applogging)
 
-The context logger middleware adds a logger to the context that can be used to log out anything that happens during the request lifecycle. These logs get sent to the CtxLog table and can be used for debugging issues in your service. The caller has the option to pass in extra attributes to log out info beyond the defaults the middleware logs. Addtionally, this middleware can be used in conjunction with the OperationRequest middleware to grab operation specific info from the context and include it in the context log attributes. 
+The context logger middleware adds a logger to the context that can be used to log out anything that happens during the request lifecycle. These logs get sent to the CtxLog table and can be used for debugging issues in your service. The caller has the option to pass in extra attributes to log out info beyond the defaults the middleware logs. These logs are in json format and can be be unmarshaled and used like so: 
+| extend logjson = parse_json(log)
+| where logjson.operationID == "ce99dc86-930a-4011-b196-fd8a4fa3c958"
+
+ Addtionally, this middleware can be used in conjunction with the OperationRequest middleware to grab operation specific info from the context and include it in the context log attributes. 
 
 ##### <a id='Usage-1'></a>Usage
 

@@ -127,7 +127,7 @@ var _ = Describe("OperationRequest and ContextLogger Integration", func() {
 		logOutput, err := io.ReadAll(logBuf)
 		Expect(err).NotTo(HaveOccurred())
 		outStr := string(logOutput)
-		logInfo, err := getLogString(outStr)
+		logInfo, err := unmarshalLog(outStr)
 		Expect(err).NotTo(HaveOccurred(), "failed to parse log string")
 
 		fmt.Println("Log Info:", logInfo)

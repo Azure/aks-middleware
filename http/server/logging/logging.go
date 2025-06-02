@@ -2,6 +2,7 @@ package logging
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"time"
@@ -59,12 +60,12 @@ func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	// TODO (tomabraham): move RequestStart and RequestEnd to a different interceptor
 	// ApiRequestLog should only get "finished call" logs
-	l.LogRequestEnd(ctx, r, "RequestEnd", data)
+	l.LogRequestEnd(ctx, r, "RequestEnd", data) //TODO: do we want to error out here if json.Marshal fails in BuildAttributes?
 	l.LogRequestEnd(ctx, r, "finished call", data)
 
 }
 
-func BuildAttributes(ctx context.Context, r *http.Request, extra ...interface{}) []interface{} {
+func BuildAttributes(ctx context.Context, r *http.Request, extra ...interface{}) ([]interface{}, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
 	attributes := []interface{}{
 		"source", "ApiRequestLog",
@@ -85,18 +86,32 @@ func BuildAttributes(ctx context.Context, r *http.Request, extra ...interface{})
 		}
 	}
 
-	attributes = append(attributes, "headers", headers)
+	headerBytes, err := json.Marshal(headers)
+	if err != nil {
+		return nil, err
+	}
+	headersStr := string(headerBytes)
+
+	attributes = append(attributes, "headers", headersStr)
 	attributes = append(attributes, extra...)
-	return attributes
+	return attributes, nil
 }
 
 func (l *loggingMiddleware) LogRequestStart(ctx context.Context, r *http.Request, msg string) {
-	attributes := BuildAttributes(ctx, r)
+	attributes, err := BuildAttributes(ctx, r)
+	if err != nil {
+		l.logger.ErrorContext(ctx, "error building attributes for request start log", "error", err) //TODO: return error in this function, and fail in servehttp?
+		return
+	}
 	l.logger.InfoContext(ctx, msg, attributes...)
 }
 
 func (l *loggingMiddleware) LogRequestEnd(ctx context.Context, r *http.Request, msg string, data RequestLogData) {
-	attributes := BuildAttributes(ctx, r, "code", data.Code, "time_ms", data.Duration.Milliseconds(), "error", data.Error)
+	attributes, err := BuildAttributes(ctx, r, "code", data.Code, "time_ms", data.Duration.Milliseconds(), "error", data.Error)
+	if err != nil {
+		l.logger.ErrorContext(ctx, "error building attributes for request end log", "error", err)
+		return
+	}
 	if data.Code >= http.StatusBadRequest {
 		l.logger.ErrorContext(ctx, msg, attributes...)
 	} else {
