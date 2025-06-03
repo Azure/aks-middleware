@@ -60,9 +60,8 @@ func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	// TODO (tomabraham): move RequestStart and RequestEnd to a different interceptor
 	// ApiRequestLog should only get "finished call" logs
-	l.LogRequestEnd(ctx, r, "RequestEnd", data) //TODO: do we want to error out here if json.Marshal fails in BuildAttributes?
+	l.LogRequestEnd(ctx, r, "RequestEnd", data)
 	l.LogRequestEnd(ctx, r, "finished call", data)
-
 }
 
 func BuildAttributes(ctx context.Context, r *http.Request, extra ...interface{}) ([]interface{}, error) {
