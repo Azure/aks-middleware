@@ -2,9 +2,12 @@ package logging
 
 import (
 	"bytes"
+	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 
 	"github.com/Azure/aks-middleware/http/server/requestid"
 	"github.com/gorilla/mux"
@@ -74,9 +77,20 @@ var _ = Describe("Httpmw", func() {
 			req.Header.Set(requestid.RequestCorrelationIDHeader, "test-correlation-id")
 
 			router.ServeHTTP(w, req)
+			//runfunc()
+			lines := strings.Split(buf.String(), "\n")
+			var headersMap map[string]interface{}
+			var err error
+			for _, line := range lines {
+				if strings.Contains(line, `"headers"`) {
+					headersMap, err = unmarshalHeaders(line)
+					Expect(err).ToNot(HaveOccurred(), "failed to unmarshal headers from log output")
+					break
+				}
+			}
 
-			Expect(buf.String()).To(ContainSubstring(`"operationid":"test-operation-id"`))
-			Expect(buf.String()).To(ContainSubstring(`"correlationid":"test-correlation-id"`))
+			Expect(headersMap["operationid"]).To(Equal("test-operation-id"))
+			Expect(headersMap["correlationid"]).To(Equal("test-correlation-id"))
 			Expect(buf.String()).ToNot(ContainSubstring(`"armclientrequestid"`))
 			Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
 		})
@@ -94,3 +108,57 @@ var _ = Describe("Httpmw", func() {
 		})
 	})
 })
+
+type LogLine struct {
+	Headers string `json:"headers"`
+}
+
+func unmarshalHeaders(log string) (map[string]interface{}, error) {
+	fmt.Println("headers to unmarshal: ", log)
+	var outer map[string]interface{}
+	if err := json.Unmarshal([]byte(log), &outer); err != nil {
+		fmt.Println("failed here==")
+		return nil, fmt.Errorf("failed to unmarshal headers log output: %w", err)
+	}
+	headersStr, ok := outer["headers"]
+	if !ok {
+		return nil, fmt.Errorf("headers key not found or not a string in log output")
+	}
+	var inner map[string]interface{}
+	err := json.Unmarshal([]byte(headersStr.(string)), &inner)
+	if err != nil {
+		fmt.Println("failed here 2==")
+
+		return nil, fmt.Errorf("failed to unmarshal headers log string: %w", err)
+	}
+	return inner, nil
+}
+
+func runfunc(jsonString string) (map[string]interface{}, error) {
+	// JSON string
+	//jsonString := `{"time":"2025-06-02T16:58:09.938507761Z","level":"INFO","msg":"RequestStart","source":"ApiRequestLog","protocol":"HTTP","method_type":"unary","component":"server","method":"GET /","service":"example.com","url":"/","headers":"{\"correlationid\":\"test-correlation-id\",\"operationid\":\"test-operation-id\"}"}`
+
+	// Unmarshal JSON into a map[string]interface{}
+	var result map[string]interface{}
+	err := json.Unmarshal([]byte(jsonString), &result)
+	if err != nil {
+		fmt.Println("Error unmarshaling JSON:", err)
+		return nil, err
+	}
+
+	// Print the result
+	fmt.Println(result)
+
+	// If you need to access the nested headers field
+	headers := result["headers"].(string)
+	var headersMap map[string]interface{}
+	err = json.Unmarshal([]byte(headers), &headersMap)
+	if err != nil {
+		fmt.Println("Error unmarshaling headers:", err)
+		return nil, err
+	}
+
+	// Print the headers map
+	fmt.Println(headersMap)
+	return headersMap, nil
+}
