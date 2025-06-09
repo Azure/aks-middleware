@@ -14,12 +14,6 @@ import (
 	"github.com/gorilla/mux"
 )
 
-type ctxKey int
-
-const (
-	opReqKey ctxKey = iota
-)
-
 // BaseOperationRequest contains the common fields
 type BaseOperationRequest struct {
 	APIVersion       string
@@ -41,6 +35,12 @@ type BaseOperationRequest struct {
 	// can't grab the struct if user defines their own type for extras
 	Extras map[string]interface{} `json:"extras"`
 }
+
+type ctxKey int
+
+const (
+	opReqKey ctxKey = iota
+)
 
 // OperationRequestCustomizerFunc is a function to customize the extras.
 type OperationRequestCustomizerFunc func(extras map[string]interface{}, headers http.Header, vars map[string]string) error
