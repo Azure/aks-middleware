@@ -135,4 +135,25 @@ var _ = Describe("LogRequest", func() {
 			Expect(logBuffer.String()).To(ContainSubstring(expected))
 		})
 	})
+
+	Context("when URL is not a valid resource ID and requires fallback", func() {
+		It("logs the URL with api-version and everything after removed", func() {
+			parsedURL, err := url.Parse("https://example.com/api/nonResourcePath?param1=value1&api-version=2023-01-01")
+			Expect(err).To(BeNil())
+
+			params := logging.LogRequestParams{
+				Logger:    logger,
+				StartTime: time.Now(),
+				Request:   &http.Request{Method: "GET", URL: parsedURL},
+				Response:  &http.Response{StatusCode: 200},
+				Error:     nil,
+			}
+
+			logging.LogRequest(params)
+
+			// The URL should remove the query paramters for the method attribute
+			Expect(logBuffer.String()).To(ContainSubstring("GET https://example.com/api/nonResourcePath"))
+			Expect(logBuffer.String()).ToNot(ContainSubstring("GET https://example.com/api/nonResourcePath?param1=value1&api-version=2023-01-01"))
+		})
+	})
 })
