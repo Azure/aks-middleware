@@ -100,7 +100,6 @@ func (l *loggingMiddleware) LogRequestStart(ctx context.Context, r *http.Request
 	attributes, err := BuildAttributes(ctx, r)
 	if err != nil {
 		l.logger.ErrorContext(ctx, "error building attributes for request start log", "error", err) //TODO: no need to log here if we know that there's no issue with the values we're passing in?
-		return
 	}
 	l.logger.InfoContext(ctx, msg, attributes...)
 }
@@ -109,7 +108,6 @@ func (l *loggingMiddleware) LogRequestEnd(ctx context.Context, r *http.Request, 
 	attributes, err := BuildAttributes(ctx, r, "code", data.Code, "time_ms", data.Duration.Milliseconds(), "error", data.Error)
 	if err != nil {
 		l.logger.ErrorContext(ctx, "error building attributes for request end log", "error", err) //TODO: no need to log here if we know that there's no issue with the values we're passing in?
-		return
 	}
 	if data.Code >= http.StatusBadRequest {
 		l.logger.ErrorContext(ctx, msg, attributes...)

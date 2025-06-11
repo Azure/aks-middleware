@@ -162,7 +162,7 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 		Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
 	})
 
-	It("should return an error if it cannot marshal an attribute", func() {
+	It("should continue logging even if an attribute cannot be marshaled", func() {
 		w := httptest.NewRecorder()
 		req := httptest.NewRequest("GET", "/", nil)
 		req.Header.Set(requestid.RequestAcsOperationIDHeader, "test-operation-id")
