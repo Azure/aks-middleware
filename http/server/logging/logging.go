@@ -92,12 +92,17 @@ func BuildAttributes(ctx context.Context, r *http.Request, extra ...interface{})
 
 	templogger := log.New(log.NewJSONHandler(os.Stdout, nil)).With("source", apiRequestLogSource)
 	headerBytes, err := json.Marshal(headers)
-	if err != nil {
-		templogger.Error("error marshaling headers", "error", err)
-	}
 	headersStr := string(headerBytes)
 
-	attributes = append(attributes, "headers", headersStr)
+	var finalHeaders interface{}
+	if err != nil {
+		templogger.Error("error marshaling headers", "error", err)
+		finalHeaders = headers
+	} else {
+		finalHeaders = headersStr
+	}
+
+	attributes = append(attributes, "headers", finalHeaders)
 	attributes = append(attributes, extra...)
 	return attributes
 }

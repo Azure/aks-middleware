@@ -105,15 +105,22 @@ func BuildAttributes(ctx context.Context, r *http.Request, extractFunc func(ctx 
 	attributesStr := string(attrBytes)
 
 	headerBytes, err := json.Marshal(headers)
-	if err != nil {
-		templogger.With("source", ctxLogSource).Error("error marshaling headers", "error", err)
-	}
 	headersStr := string(headerBytes)
 
+	var finalHeaders, finalAttributes interface{}
+	if err != nil {
+		templogger.With("source", ctxLogSource).Error("error marshaling headers", "error", err)
+		finalHeaders = headers
+		finalAttributes = logAttrs
+	} else {
+		finalHeaders = headersStr
+		finalAttributes = attributesStr
+	}
+
 	// Include metadata headers as part of the attributes.
-	attributes = append(attributes, "log", attributesStr)
+	attributes = append(attributes, "log", finalAttributes)
 	// grab desired headers from the request (based on extraction function passed to request ID middleware)
-	attributes = append(attributes, "headers", headersStr)
+	attributes = append(attributes, "headers", finalHeaders)
 	return attributes
 }
 
