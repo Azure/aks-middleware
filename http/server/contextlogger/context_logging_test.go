@@ -172,7 +172,6 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 		routersMap[extraLoggingCannotMarshal].ServeHTTP(w, req)
 
 		out := routerConfigs[extraLoggingCannotMarshal].buf.String()
-		fmt.Println("log output: ", out)
 		Expect(out).To(ContainSubstring(`\"operationid\":\"test-operation-id\"`))
 		Expect(out).To(ContainSubstring(`\"correlationid\":\"test-correlation-id\"`))
 	})
@@ -217,10 +216,8 @@ func unmarshalLog(out string) (map[string]interface{}, error) {
 }
 
 func unmarshalHeaders(log string) (map[string]interface{}, error) {
-	fmt.Println("headers to unmarshal: ", log)
 	var outer map[string]interface{}
 	if err := json.Unmarshal([]byte(log), &outer); err != nil {
-		fmt.Println("failed here==")
 		return nil, fmt.Errorf("failed to unmarshal headers log output: %w", err)
 	}
 	headersStr, ok := outer["headers"]
@@ -230,8 +227,6 @@ func unmarshalHeaders(log string) (map[string]interface{}, error) {
 	var inner map[string]interface{}
 	err := json.Unmarshal([]byte(headersStr.(string)), &inner)
 	if err != nil {
-		fmt.Println("failed here 2==")
-
 		return nil, fmt.Errorf("failed to unmarshal headers log string: %w", err)
 	}
 	return inner, nil

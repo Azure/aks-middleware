@@ -130,7 +130,6 @@ var _ = Describe("OperationRequest and ContextLogger Integration", func() {
 		logInfo, err := unmarshalLog(outStr)
 		Expect(err).NotTo(HaveOccurred(), "failed to parse log string")
 
-		fmt.Println("Log Info:", logInfo)
 		// Expect the log to contain specified operation request details.
 		Expect(logInfo["SubscriptionID"]).To(Equal("sub123"))
 		Expect(logInfo["ResourceGroup"]).To(Equal("rg123"))
