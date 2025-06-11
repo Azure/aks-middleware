@@ -23,7 +23,6 @@ var _ = Describe("Httpmw", func() {
 	)
 
 	BeforeEach(func() {
-
 		buf = new(bytes.Buffer)
 		slogLogger = slog.New(slog.NewJSONHandler(buf, nil))
 

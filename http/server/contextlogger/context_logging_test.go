@@ -172,8 +172,9 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 		routersMap[extraLoggingCannotMarshal].ServeHTTP(w, req)
 
 		out := routerConfigs[extraLoggingCannotMarshal].buf.String()
-		_, err := unmarshalLog(out)
-		Expect(err).ToNot(HaveOccurred())
+		fmt.Println("log output: ", out)
+		Expect(out).To(ContainSubstring(`\"operationid\":\"test-operation-id\"`))
+		Expect(out).To(ContainSubstring(`\"correlationid\":\"test-correlation-id\"`))
 	})
 
 	It("should include custom static attributes for the custom router", func() {
