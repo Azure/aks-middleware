@@ -99,7 +99,7 @@ func BuildAttributes(ctx context.Context, r *http.Request, extra ...interface{})
 func (l *loggingMiddleware) LogRequestStart(ctx context.Context, r *http.Request, msg string) {
 	attributes, err := BuildAttributes(ctx, r)
 	if err != nil {
-		l.logger.ErrorContext(ctx, "error building attributes for request start log", "error", err) //TODO: return error in this function, and fail in servehttp?
+		l.logger.ErrorContext(ctx, "error building attributes for request start log", "error", err)
 		return
 	}
 	l.logger.InfoContext(ctx, msg, attributes...)
