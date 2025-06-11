@@ -69,7 +69,7 @@ func (m *contextLogMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	attributes, err := BuildAttributes(ctx, r, m.extractFunction)
 	if err != nil {
 		errStr := fmt.Sprintf("failed to build attributes for context logger: %s", err)
-		log.Default().With("src", "error in context logging middleware").Error(errStr)
+		log.Default().With("source", ctxLogSource).Error(errStr)
 	}
 
 	contextLogger := m.logger.With(attributes...)

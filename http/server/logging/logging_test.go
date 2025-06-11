@@ -133,32 +133,3 @@ func unmarshalHeaders(log string) (map[string]interface{}, error) {
 	}
 	return inner, nil
 }
-
-func runfunc(jsonString string) (map[string]interface{}, error) {
-	// JSON string
-	//jsonString := `{"time":"2025-06-02T16:58:09.938507761Z","level":"INFO","msg":"RequestStart","source":"ApiRequestLog","protocol":"HTTP","method_type":"unary","component":"server","method":"GET /","service":"example.com","url":"/","headers":"{\"correlationid\":\"test-correlation-id\",\"operationid\":\"test-operation-id\"}"}`
-
-	// Unmarshal JSON into a map[string]interface{}
-	var result map[string]interface{}
-	err := json.Unmarshal([]byte(jsonString), &result)
-	if err != nil {
-		fmt.Println("Error unmarshaling JSON:", err)
-		return nil, err
-	}
-
-	// Print the result
-	fmt.Println(result)
-
-	// If you need to access the nested headers field
-	headers := result["headers"].(string)
-	var headersMap map[string]interface{}
-	err = json.Unmarshal([]byte(headers), &headersMap)
-	if err != nil {
-		fmt.Println("Error unmarshaling headers:", err)
-		return nil, err
-	}
-
-	// Print the headers map
-	fmt.Println(headersMap)
-	return headersMap, nil
-}
