@@ -173,7 +173,7 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 
 		out := routerConfigs[extraLoggingCannotMarshal].buf.String()
 		_, err := unmarshalLog(out)
-		Expect(err).To(HaveOccurred(), "failed to parse log string")
+		Expect(err).ToNot(HaveOccurred())
 	})
 
 	It("should include custom static attributes for the custom router", func() {

@@ -11,10 +11,7 @@ import (
 type PanicHandlerFunc func(logger slog.Logger, w http.ResponseWriter, r *http.Request, err interface{})
 
 func defaultPanicHandler(logger slog.Logger, w http.ResponseWriter, r *http.Request, err interface{}) {
-	attributes, err := logging.BuildAttributes(r.Context(), r, "error", err)
-	if err != nil {
-		logger.ErrorContext(r.Context(), "Failed to build attributes for panic logging", slog.Any("error", err))
-	}
+	attributes := logging.BuildAttributes(r.Context(), r, "error", err)
 	logger.ErrorContext(r.Context(), "Panic occurred", attributes...)
 	http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 }

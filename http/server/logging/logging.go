@@ -3,8 +3,9 @@ package logging
 import (
 	"context"
 	"encoding/json"
-	"log/slog"
+	log "log/slog"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/Azure/aks-middleware/http/common/logging"
@@ -15,8 +16,12 @@ import (
 // TODO (Tom): Add a logger wrapper in its own package
 // https://medium.com/@ansujain/building-a-logger-wrapper-in-go-with-support-for-multiple-logging-libraries-48092b826bee
 
+const (
+	apiRequestLogSource = "ApiRequestLog"
+)
+
 // more info about http handler here: https://pkg.go.dev/net/http#Handler
-func NewLogging(logger *slog.Logger) mux.MiddlewareFunc {
+func NewLogging(logger *log.Logger) mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return &loggingMiddleware{
 			next:   next,
@@ -32,7 +37,7 @@ var _ http.Handler = &loggingMiddleware{}
 type loggingMiddleware struct {
 	next   http.Handler
 	now    func() time.Time
-	logger *slog.Logger
+	logger *log.Logger
 }
 type RequestLogData struct {
 	Code     int
@@ -64,7 +69,7 @@ func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	l.LogRequestEnd(ctx, r, "finished call", data)
 }
 
-func BuildAttributes(ctx context.Context, r *http.Request, extra ...interface{}) ([]interface{}, error) {
+func BuildAttributes(ctx context.Context, r *http.Request, extra ...interface{}) []interface{} {
 	md, ok := metadata.FromIncomingContext(ctx)
 	attributes := []interface{}{
 		"source", "ApiRequestLog",
@@ -85,30 +90,25 @@ func BuildAttributes(ctx context.Context, r *http.Request, extra ...interface{})
 		}
 	}
 
+	templogger := log.New(log.NewJSONHandler(os.Stdout, nil)).With("source", apiRequestLogSource)
 	headerBytes, err := json.Marshal(headers)
 	if err != nil {
-		return nil, err
+		templogger.Error("error marshaling headers", "error", err)
 	}
 	headersStr := string(headerBytes)
 
 	attributes = append(attributes, "headers", headersStr)
 	attributes = append(attributes, extra...)
-	return attributes, nil
+	return attributes
 }
 
 func (l *loggingMiddleware) LogRequestStart(ctx context.Context, r *http.Request, msg string) {
-	attributes, err := BuildAttributes(ctx, r)
-	if err != nil {
-		l.logger.ErrorContext(ctx, "error building attributes for request start log", "error", err) //TODO: no need to log here if we know that there's no issue with the values we're passing in?
-	}
+	attributes := BuildAttributes(ctx, r)
 	l.logger.InfoContext(ctx, msg, attributes...)
 }
 
 func (l *loggingMiddleware) LogRequestEnd(ctx context.Context, r *http.Request, msg string, data RequestLogData) {
-	attributes, err := BuildAttributes(ctx, r, "code", data.Code, "time_ms", data.Duration.Milliseconds(), "error", data.Error)
-	if err != nil {
-		l.logger.ErrorContext(ctx, "error building attributes for request end log", "error", err) //TODO: no need to log here if we know that there's no issue with the values we're passing in?
-	}
+	attributes := BuildAttributes(ctx, r, "code", data.Code, "time_ms", data.Duration.Milliseconds(), "error", data.Error)
 	if data.Code >= http.StatusBadRequest {
 		l.logger.ErrorContext(ctx, msg, attributes...)
 	} else {

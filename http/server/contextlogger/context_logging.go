@@ -3,9 +3,9 @@ package contextlogger
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	log "log/slog"
 	"net/http"
+	"os"
 
 	opreq "github.com/Azure/aks-middleware/http/server/operationrequest"
 	"github.com/gorilla/mux"
@@ -66,11 +66,7 @@ type contextLogMiddleware struct {
 
 func (m *contextLogMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	attributes, err := BuildAttributes(ctx, r, m.extractFunction)
-	if err != nil {
-		errStr := fmt.Sprintf("failed to build attributes for context logger: %s", err)
-		log.Default().With("source", ctxLogSource).Error(errStr)
-	}
+	attributes := BuildAttributes(ctx, r, m.extractFunction)
 
 	contextLogger := m.logger.With(attributes...)
 	ctx = context.WithValue(ctx, loggerKey, contextLogger)
@@ -79,7 +75,7 @@ func (m *contextLogMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	m.next.ServeHTTP(w, r)
 }
 
-func BuildAttributes(ctx context.Context, r *http.Request, extractFunc func(ctx context.Context, r *http.Request) map[string]interface{}) ([]interface{}, error) {
+func BuildAttributes(ctx context.Context, r *http.Request, extractFunc func(ctx context.Context, r *http.Request) map[string]interface{}) []interface{} {
 	md, ok := metadata.FromIncomingContext(ctx)
 	headers := make(map[string]string)
 	if ok {
@@ -102,14 +98,15 @@ func BuildAttributes(ctx context.Context, r *http.Request, extractFunc func(ctx 
 	}
 
 	attrBytes, err := json.Marshal(logAttrs)
+	templogger := log.New(log.NewJSONHandler(os.Stdout, nil))
 	if err != nil {
-		return nil, err
+		templogger.With("source", ctxLogSource).Error("error building attributes for additional attributes", "error", err)
 	}
 	attributesStr := string(attrBytes)
 
 	headerBytes, err := json.Marshal(headers)
 	if err != nil {
-		return nil, err
+		templogger.With("source", ctxLogSource).Error("error marshaling headers", "error", err)
 	}
 	headersStr := string(headerBytes)
 
@@ -117,7 +114,7 @@ func BuildAttributes(ctx context.Context, r *http.Request, extractFunc func(ctx 
 	attributes = append(attributes, "log", attributesStr)
 	// grab desired headers from the request (based on extraction function passed to request ID middleware)
 	attributes = append(attributes, "headers", headersStr)
-	return attributes, nil
+	return attributes
 }
 
 func defaultCtxLogAttributes(r *http.Request) []interface{} {
