@@ -65,16 +65,7 @@ var _ = Describe("Autologger Tests", func() {
 
 	})
 
-	It("should handle empty correlation and operation IDs correctly", func() {
-		// Create an OperationRequest with empty correlation and operation IDs
-		opRequest := &opreq.BaseOperationRequest{
-			CorrelationID: "",
-			OperationID:   "",
-			Extras:        make(map[string]interface{}),
-		}
-
-		ctx = opreq.OperationRequestWithContext(ctx, opRequest)
-
+	It("should handle nonexistent operation request struct correctly", func() {
 		interceptorLogger := autologger.InterceptorLogger(logger)
 
 		interceptorLogger.Log(ctx, logging.LevelInfo, "test message", "key1", "value1")
@@ -87,5 +78,8 @@ var _ = Describe("Autologger Tests", func() {
 		Expect(logEntry).NotTo(HaveKey("correlation_id"))
 		Expect(logEntry).NotTo(HaveKey("operation_id"))
 		Expect(logEntry).NotTo(HaveKey("headers"))
+		Expect(logEntry).To(HaveKeyWithValue("key1", "value1"))
+		Expect(logEntry).To(HaveKeyWithValue("msg", "test message"))
+		Expect(logEntry).To(HaveKeyWithValue("level", "INFO"))
 	})
 })
