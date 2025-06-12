@@ -98,9 +98,9 @@ func BuildAttributes(ctx context.Context, r *http.Request, extractFunc func(ctx 
 	}
 
 	attrBytes, err := json.Marshal(logAttrs)
-	templogger := log.New(log.NewJSONHandler(os.Stdout, nil))
+	templogger := log.New(log.NewJSONHandler(os.Stdout, nil)).With("source", ctxLogSource)
 	if err != nil {
-		templogger.With("source", ctxLogSource).Error("error building attributes for additional attributes", "error", err)
+		templogger.Error("error building attributes for additional attributes", "error", err)
 	}
 	attributesStr := string(attrBytes)
 
@@ -109,7 +109,7 @@ func BuildAttributes(ctx context.Context, r *http.Request, extractFunc func(ctx 
 
 	var finalHeaders, finalAttributes interface{}
 	if err != nil {
-		templogger.With("source", ctxLogSource).Error("error marshaling headers", "error", err)
+		templogger.Error("error marshaling headers", "error", err)
 		finalHeaders = headers
 		finalAttributes = logAttrs
 	} else {

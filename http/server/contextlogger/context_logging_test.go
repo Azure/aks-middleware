@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 
 	"github.com/Azure/aks-middleware/http/server/requestid"
@@ -163,17 +164,29 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 	})
 
 	It("should continue logging even if an attribute cannot be marshaled", func() {
-		w := httptest.NewRecorder()
+		// Capture os.Stdout for temp log message on failed unmarshal
+		oldStdout := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+
+		wr := httptest.NewRecorder()
 		req := httptest.NewRequest("GET", "/", nil)
 		req.Header.Set(requestid.RequestAcsOperationIDHeader, "test-operation-id")
 		req.Header.Set(requestid.RequestCorrelationIDHeader, "test-correlation-id")
 		req.Header.Set(requestid.RequestARMClientRequestIDHeader, "test-request-id")
 
-		routersMap[extraLoggingCannotMarshal].ServeHTTP(w, req)
+		routersMap[extraLoggingCannotMarshal].ServeHTTP(wr, req)
+
+		w.Close()
+		os.Stdout = oldStdout
+		var buf bytes.Buffer
+		io.Copy(&buf, r)
 
 		out := routerConfigs[extraLoggingCannotMarshal].buf.String()
 		Expect(out).To(ContainSubstring(`\"operationid\":\"test-operation-id\"`))
 		Expect(out).To(ContainSubstring(`\"correlationid\":\"test-correlation-id\"`))
+
+		Expect(buf.String()).To(ContainSubstring("error building attributes for additional attributes"))
 	})
 
 	It("should include custom static attributes for the custom router", func() {
