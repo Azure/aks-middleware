@@ -1,16 +1,16 @@
 package logging
 
 import (
-    "bytes"
-    "log/slog"
-    "net/http"
-    "net/url"
-    "strings"
-    "time"
+	"bytes"
+	"log/slog"
+	"net/http"
+	"net/url"
+	"strings"
+	"time"
 
-    "github.com/Azure/aks-middleware/http/common"
-    "github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
-    azcorePolicy "github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
+	"github.com/Azure/aks-middleware/http/common"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
+	azcorePolicy "github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 )
 
 type LogRequestParams struct {
@@ -60,7 +60,6 @@ func GetMethodInfo(method string, rawURL string) string {
         if err != nil {
             // Fallback: if parsing still fails, use the full URL (minus query params and api version).
             // This is to avoid providing aggregated data for each api version/param in dashboards
-            // Full URL can still be found in the logs
             return method + " " + rawURL
         }
         // We know a fake resource name was added.
@@ -83,7 +82,7 @@ func GetMethodInfo(method string, rawURL string) string {
 }
 
 func TrimURL(parsedURL url.URL) string {
-    // Reconstruct the URL with only the `api-version` parameter, removing any other query parameters.
+    // Reconstruct the URL without `api-version` parameter and any other query parameters.
     baseURL := parsedURL.Scheme + "://" + parsedURL.Host + parsedURL.Path
 
     return baseURL
