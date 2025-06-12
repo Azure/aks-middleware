@@ -2,13 +2,12 @@ package logging
 
 import (
 	"bytes"
-	"encoding/json"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 
+	common "github.com/Azure/aks-middleware/http/common/logging"
 	"github.com/Azure/aks-middleware/http/server/requestid"
 	"github.com/gorilla/mux"
 	. "github.com/onsi/ginkgo/v2"
@@ -76,13 +75,13 @@ var _ = Describe("Httpmw", func() {
 			req.Header.Set(requestid.RequestCorrelationIDHeader, "test-correlation-id")
 
 			router.ServeHTTP(w, req)
-			//runfunc()
+
 			lines := strings.Split(buf.String(), "\n")
 			var headersMap map[string]interface{}
 			var err error
 			for _, line := range lines {
 				if strings.Contains(line, `"headers"`) {
-					headersMap, err = unmarshalHeaders(line)
+					headersMap, err = common.UnmarshalHeaders(line)
 					Expect(err).ToNot(HaveOccurred(), "failed to unmarshal headers from log output")
 					break
 				}
@@ -110,21 +109,4 @@ var _ = Describe("Httpmw", func() {
 
 type LogLine struct {
 	Headers string `json:"headers"`
-}
-
-func unmarshalHeaders(log string) (map[string]interface{}, error) {
-	var outer map[string]interface{}
-	if err := json.Unmarshal([]byte(log), &outer); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal headers log output: %w", err)
-	}
-	headersStr, ok := outer["headers"]
-	if !ok {
-		return nil, fmt.Errorf("headers key not found or not a string in log output")
-	}
-	var inner map[string]interface{}
-	err := json.Unmarshal([]byte(headersStr.(string)), &inner)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal headers log string: %w", err)
-	}
-	return inner, nil
 }
