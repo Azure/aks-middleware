@@ -69,6 +69,8 @@ func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
   l.LogRequestEnd(ctx, r, "finished call", data)
 }
 
+// Headers are json.Marshaled, but if that fails, the headers are sent to kusto as the original map[string]string
+// The function logs to ApiRequestLog to notify users of the error if they wish to fix it
 func BuildAttributes(ctx context.Context, r *http.Request, extra ...interface{}) []interface{} {
   md, ok := metadata.FromIncomingContext(ctx)
   attributes := []interface{}{

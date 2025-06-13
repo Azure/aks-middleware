@@ -76,6 +76,8 @@ func (m *contextLogMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	m.next.ServeHTTP(w, r)
 }
 
+// Headers and extra attributes are json.Marshaled, but if that fails, the headers are sent to kusto as the original map[string]string
+// The function logs to CtxLog to notify users of the error if they wish to fix it
 func BuildAttributes(ctx context.Context, r *http.Request, extractFunc func(ctx context.Context, r *http.Request) map[string]interface{}) []interface{} {
 	md, ok := metadata.FromIncomingContext(ctx)
 	headers := make(map[string]string)
