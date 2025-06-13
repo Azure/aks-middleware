@@ -2,8 +2,6 @@ package logging
 
 import (
     "bytes"
-    "encoding/json"
-    "fmt"
     "log/slog"
     "net/http"
     "net/url"
@@ -214,21 +212,4 @@ func (w *ResponseWriter) Write(b []byte) (int, error) {
         w.Buf.Write(b)
     }
     return w.ResponseWriter.Write(b)
-}
-
-func UnmarshalHeaders(log string) (map[string]interface{}, error) {
-    var outer map[string]interface{}
-    if err := json.Unmarshal([]byte(log), &outer); err != nil {
-        return nil, fmt.Errorf("failed to unmarshal headers log output: %w", err)
-    }
-    headersStr, ok := outer["headers"]
-    if !ok {
-        return nil, fmt.Errorf("headers key not found or not a string in log output")
-    }
-    var inner map[string]interface{}
-    err := json.Unmarshal([]byte(headersStr.(string)), &inner)
-    if err != nil {
-        return nil, fmt.Errorf("failed to unmarshal headers log string: %w", err)
-    }
-    return inner, nil
 }
