@@ -5,8 +5,8 @@ go 1.23
 toolchain go1.23.0
 
 require (
-	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.32.0-20231115204500-e097f827e652.1
-	buf.build/gen/go/service-hub/loggable/protocolbuffers/go v1.32.0-20231012175355-a349f6324a7e.1
+	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.31.0-20230802163732-1c33ebd9ecfa.1
+	buf.build/gen/go/service-hub/loggable/protocolbuffers/go v1.36.6-20231012175355-a349f6324a7e.1
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.9.1
 	github.com/bufbuild/protovalidate-go v0.2.1
 	github.com/gofrs/uuid v4.4.0+incompatible
@@ -18,7 +18,7 @@ require (
 	github.com/onsi/gomega v1.30.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20250204164813-702378808489
 	google.golang.org/grpc v1.70.0
-	google.golang.org/protobuf v1.36.5
+	google.golang.org/protobuf v1.36.6
 )
 
 require (
