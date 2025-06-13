@@ -58,7 +58,8 @@ func GetMethodInfo(method string, rawURL string) string {
         }
         id, err = arm.ParseResourceID(fakeURL)
         if err != nil {
-            // Fallback: if parsing still fails, use the full URL.
+            // Fallback: if parsing still fails, use the full URL (minus query params and api version).
+            // This is to avoid providing aggregated data for each api version/param in dashboards
             return method + " " + rawURL
         }
         // We know a fake resource name was added.
@@ -81,14 +82,9 @@ func GetMethodInfo(method string, rawURL string) string {
 }
 
 func TrimURL(parsedURL url.URL) string {
-    // Extract the `api-version` parameter
-    apiVersion := parsedURL.Query().Get("api-version")
-
-    // Reconstruct the URL with only the `api-version` parameter
+    // Reconstruct the URL without `api-version` parameter and any other query parameters.
     baseURL := parsedURL.Scheme + "://" + parsedURL.Host + parsedURL.Path
-    if apiVersion != "" {
-        return baseURL + "?api-version=" + apiVersion
-    }
+
     return baseURL
 }
 
@@ -107,7 +103,7 @@ func LogRequest(params LogRequestParams) {
     default:
         return // Unknown request type, do nothing
     }
-
+    fullURL := reqURL
     parsedURL, parseErr := url.Parse(reqURL)
     if parseErr != nil {
         params.Logger.With(
@@ -119,7 +115,7 @@ func LogRequest(params LogRequestParams) {
             "time_ms", "na",
             "method", method,
             "service", service,
-            "url", reqURL,
+            "url", fullURL,
             "error", parseErr.Error(),
         ).Error("error parsing request URL")
     } else {
@@ -142,7 +138,7 @@ func LogRequest(params LogRequestParams) {
         "time_ms", latency,
         "method", methodInfo,
         "service", service,
-        "url", reqURL,
+        "url", fullURL,
         "headers", headers,
     )
 

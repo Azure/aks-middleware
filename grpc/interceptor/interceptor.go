@@ -82,7 +82,6 @@ func DefaultClientInterceptors(options ClientInterceptorLogOptions) []grpc.Unary
 			autologger.InterceptorLogger(apiRequestLogger),
 			logging.WithLogOnEvents(logging.FinishCall),
 			logging.WithLevels(logging.DefaultServerCodeToLevel),
-			logging.WithFieldsFromContext(common.GetFields),
 		),
 	}
 }
