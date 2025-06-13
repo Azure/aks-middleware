@@ -1,16 +1,16 @@
 package logging
 
 import (
-	"bytes"
-	"log/slog"
-	"net/http"
-	"net/url"
-	"strings"
-	"time"
+    "bytes"
+    "log/slog"
+    "net/http"
+    "net/url"
+    "strings"
+    "time"
 
-	"github.com/Azure/aks-middleware/http/common"
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
-	azcorePolicy "github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
+    "github.com/Azure/aks-middleware/http/common"
+    "github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
+    azcorePolicy "github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 )
 
 type LogRequestParams struct {
