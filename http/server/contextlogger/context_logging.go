@@ -2,8 +2,10 @@ package contextlogger
 
 import (
 	"context"
+	"encoding/json"
 	log "log/slog"
 	"net/http"
+	"os"
 
 	opreq "github.com/Azure/aks-middleware/http/server/operationrequest"
 	"github.com/gorilla/mux"
@@ -65,6 +67,7 @@ type contextLogMiddleware struct {
 func (m *contextLogMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	attributes := BuildAttributes(ctx, r, m.extractFunction)
+
 	contextLogger := m.logger.With(attributes...)
 	ctx = context.WithValue(ctx, loggerKey, contextLogger)
 	r = r.WithContext(ctx)
@@ -72,6 +75,8 @@ func (m *contextLogMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	m.next.ServeHTTP(w, r)
 }
 
+// Headers and extra attributes are json.Marshaled, but if that fails, the headers are sent to kusto as the original map[string]string
+// The function logs to CtxLog to notify users of the error if they wish to fix it
 func BuildAttributes(ctx context.Context, r *http.Request, extractFunc func(ctx context.Context, r *http.Request) map[string]interface{}) []interface{} {
 	md, ok := metadata.FromIncomingContext(ctx)
 	headers := make(map[string]string)
@@ -94,10 +99,27 @@ func BuildAttributes(ctx context.Context, r *http.Request, extractFunc func(ctx 
 		}
 	}
 
-	// Include metadata headers as part of the attributes.
-	attributes = append(attributes, "log", logAttrs)
-	// grab desired headers from the request (based on extraction function passed to request ID middleware)
-	attributes = append(attributes, "headers", headers)
+	attrBytes, errMarshalAttrs := json.Marshal(logAttrs)
+	templogger := log.New(log.NewJSONHandler(os.Stdout, nil)).With("source", ctxLogSource)
+	if errMarshalAttrs != nil {
+		templogger.Error("error building attributes for additional attributes", "error", errMarshalAttrs)
+	}
+	attributesStr := string(attrBytes)
+
+	headerBytes, errMarshalHeaders := json.Marshal(headers)
+	headersStr := string(headerBytes)
+	if errMarshalHeaders != nil {
+		templogger.Error("error building attributes for headers", "error", errMarshalHeaders)
+	}
+
+	if errMarshalAttrs != nil || errMarshalHeaders != nil {
+		attributes = append(attributes, "headers", headers) // Include metadata headers as part of the attributes.
+		attributes = append(attributes, "log", logAttrs)    // grab desired headers from the request (based on extraction function passed to request ID middleware)
+	} else {
+		attributes = append(attributes, "headers", headersStr)
+		attributes = append(attributes, "log", attributesStr)
+	}
+
 	return attributes
 }
 

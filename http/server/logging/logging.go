@@ -2,8 +2,10 @@ package logging
 
 import (
 	"context"
-	"log/slog"
+	"encoding/json"
+	log "log/slog"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/Azure/aks-middleware/http/common/logging"
@@ -14,8 +16,12 @@ import (
 // TODO (Tom): Add a logger wrapper in its own package
 // https://medium.com/@ansujain/building-a-logger-wrapper-in-go-with-support-for-multiple-logging-libraries-48092b826bee
 
+const (
+	apiRequestLogSource = "ApiRequestLog"
+)
+
 // more info about http handler here: https://pkg.go.dev/net/http#Handler
-func NewLogging(logger *slog.Logger) mux.MiddlewareFunc {
+func NewLogging(logger *log.Logger) mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return &loggingMiddleware{
 			next:   next,
@@ -31,7 +37,7 @@ var _ http.Handler = &loggingMiddleware{}
 type loggingMiddleware struct {
 	next   http.Handler
 	now    func() time.Time
-	logger *slog.Logger
+	logger *log.Logger
 }
 type RequestLogData struct {
 	Code     int
@@ -61,9 +67,10 @@ func (l *loggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// ApiRequestLog should only get "finished call" logs
 	l.LogRequestEnd(ctx, r, "RequestEnd", data)
 	l.LogRequestEnd(ctx, r, "finished call", data)
-
 }
 
+// Headers are json.Marshaled, but if that fails, the headers are sent to kusto as the original map[string]string
+// The function logs to ApiRequestLog to notify users of the error if they wish to fix it
 func BuildAttributes(ctx context.Context, r *http.Request, extra ...interface{}) []interface{} {
 	md, ok := metadata.FromIncomingContext(ctx)
 	attributes := []interface{}{
@@ -85,7 +92,19 @@ func BuildAttributes(ctx context.Context, r *http.Request, extra ...interface{})
 		}
 	}
 
-	attributes = append(attributes, "headers", headers)
+	templogger := log.New(log.NewJSONHandler(os.Stdout, nil)).With("source", apiRequestLogSource)
+	headerBytes, err := json.Marshal(headers)
+	headersStr := string(headerBytes)
+
+	var finalHeaders interface{}
+	if err != nil {
+		templogger.Error("error marshaling headers", "error", err)
+		finalHeaders = headers
+	} else {
+		finalHeaders = headersStr
+	}
+
+	attributes = append(attributes, "headers", finalHeaders)
 	attributes = append(attributes, extra...)
 	return attributes
 }

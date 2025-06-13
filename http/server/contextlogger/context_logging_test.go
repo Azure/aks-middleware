@@ -3,11 +3,14 @@ package contextlogger
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"strings"
 
 	"github.com/Azure/aks-middleware/http/server/requestid"
 	"github.com/gorilla/mux"
@@ -21,6 +24,11 @@ type routerConfig struct {
 	extractFunc func(ctx context.Context, r *http.Request) map[string]interface{}
 }
 
+// should not be able to marshal this type to a string for logging
+type InvalidType struct {
+	Fn func()
+}
+
 const (
 	subscriptionIDKey    = "subscriptionID"
 	resourceGroupNameKey = "resourceGroupName"
@@ -29,6 +37,7 @@ const (
 
 	defaultRouterName         = "default"
 	extraLoggingVariablesName = "extra"
+	extraLoggingCannotMarshal = "extraCannotMarshal"
 	customTestRouterName      = "custom"
 
 	customTestKey   = "testKey"
@@ -55,6 +64,18 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 					attrs := make(map[string]interface{})
 					attrs[subscriptionIDKey] = "extractedSubIDvalue"
 					attrs[resourceGroupNameKey] = "extractedRGnamevalue"
+					attrs[resultTypeKey] = 3
+					attrs[errorDetailsKey] = "extractedErrorDetailsvalue"
+					return attrs
+				},
+			},
+			extraLoggingCannotMarshal: {
+				extractFunc: func(ctx context.Context, r *http.Request) map[string]interface{} {
+					attrs := make(map[string]interface{})
+					attrs[subscriptionIDKey] = "extractedSubIDvalue"
+					attrs[resourceGroupNameKey] = InvalidType{Fn: func() {
+						panic("cannot marshal this value")
+					}}
 					attrs[resultTypeKey] = 3
 					attrs[errorDetailsKey] = "extractedErrorDetailsvalue"
 					return attrs
@@ -120,15 +141,52 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 		routersMap[extraLoggingVariablesName].ServeHTTP(w, req)
 
 		out := routerConfigs[extraLoggingVariablesName].buf.String()
-		// Check values from requestIDExtractor.
+		logInfo, err := unmarshalLog(out)
+		Expect(err).NotTo(HaveOccurred(), "failed to parse log string")
+
+		lines := strings.Split(out, "\n")
+		var headersMap map[string]interface{}
+		for _, line := range lines {
+			if strings.Contains(line, `"headers"`) {
+				headersMap, err = unmarshalHeaders(line)
+				Expect(err).ToNot(HaveOccurred(), "failed to unmarshal headers from log output")
+				break
+			}
+		}
+		Expect(headersMap["operationid"]).To(Equal("test-operation-id"))
+		Expect(headersMap["correlationid"]).To(Equal("test-correlation-id"))
+		// Verify extra extracted attributes appear.
+		Expect(logInfo[resourceGroupNameKey]).To(Equal("extractedRGnamevalue"))
+		Expect(logInfo[subscriptionIDKey]).To(Equal("extractedSubIDvalue"))
+		Expect(logInfo[resultTypeKey]).To(Equal(float64(3)))
+		Expect(logInfo[errorDetailsKey]).To(Equal("extractedErrorDetailsvalue"))
+		Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
+	})
+
+	It("should continue logging even if an attribute cannot be marshaled", func() {
+		// Capture os.Stdout for temp log message on failed unmarshal
+		oldStdout := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+
+		wr := httptest.NewRecorder()
+		req := httptest.NewRequest("GET", "/", nil)
+		req.Header.Set(requestid.RequestAcsOperationIDHeader, "test-operation-id")
+		req.Header.Set(requestid.RequestCorrelationIDHeader, "test-correlation-id")
+		req.Header.Set(requestid.RequestARMClientRequestIDHeader, "test-request-id")
+
+		routersMap[extraLoggingCannotMarshal].ServeHTTP(wr, req)
+
+		w.Close()
+		os.Stdout = oldStdout
+		var buf bytes.Buffer
+		io.Copy(&buf, r)
+
+		out := routerConfigs[extraLoggingCannotMarshal].buf.String()
 		Expect(out).To(ContainSubstring(`"operationid":"test-operation-id"`))
 		Expect(out).To(ContainSubstring(`"correlationid":"test-correlation-id"`))
-		// Verify extra extracted attributes appear.
-		Expect(out).To(ContainSubstring(fmt.Sprintf(`"%s":"extractedRGnamevalue"`, resourceGroupNameKey)))
-		Expect(out).To(ContainSubstring(fmt.Sprintf(`"%s":"extractedSubIDvalue"`, subscriptionIDKey)))
-		Expect(out).To(ContainSubstring(fmt.Sprintf(`"%s":%d`, resultTypeKey, 3)))
-		Expect(out).To(ContainSubstring(fmt.Sprintf(`"%s":"extractedErrorDetailsvalue"`, errorDetailsKey)))
-		Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
+		Expect(buf.String()).To(ContainSubstring("error building attributes for additional attributes"))
+		Expect(out).To(ContainSubstring(fmt.Sprintf(`"%s":"!ERROR:json: unsupported type: func()"`, "log")))
 	})
 
 	It("should include custom static attributes for the custom router", func() {
@@ -152,3 +210,37 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 		Expect(gotLogger).To(Equal(expectedLogger), "expected logger from context, got a different instance")
 	})
 })
+
+func unmarshalLog(out string) (map[string]interface{}, error) {
+	var outer map[string]interface{}
+	if err := json.Unmarshal([]byte(out), &outer); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal log output: %w", err)
+	}
+	logStr, ok := outer["log"].(string)
+	if !ok {
+		return nil, fmt.Errorf("log key not found or not a string in log output")
+	}
+	var inner map[string]interface{}
+	err := json.Unmarshal([]byte(logStr), &inner)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal log string: %w", err)
+	}
+	return inner, nil
+}
+
+func unmarshalHeaders(log string) (map[string]interface{}, error) {
+    var outer map[string]interface{}
+    if err := json.Unmarshal([]byte(log), &outer); err != nil {
+        return nil, fmt.Errorf("failed to unmarshal headers log output: %w", err)
+    }
+    headersStr, ok := outer["headers"]
+    if !ok {
+        return nil, fmt.Errorf("headers key not found or not a string in log output")
+    }
+    var inner map[string]interface{}
+    err := json.Unmarshal([]byte(headersStr.(string)), &inner)
+    if err != nil {
+        return nil, fmt.Errorf("failed to unmarshal headers log string: %w", err)
+    }
+    return inner, nil
+}
