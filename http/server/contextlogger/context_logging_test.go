@@ -184,7 +184,6 @@ var _ = Describe("HttpmwWithCustomAttributeLogging", Ordered, func() {
 		io.Copy(&buf, r)
 
 		out := routerConfigs[extraLoggingCannotMarshal].buf.String()
-		fmt.Println("out: ", out)
 		Expect(out).To(ContainSubstring(`"operationid":"test-operation-id"`))
 		Expect(out).To(ContainSubstring(`"correlationid":"test-correlation-id"`))
 		Expect(buf.String()).To(ContainSubstring("error building attributes for additional attributes"))

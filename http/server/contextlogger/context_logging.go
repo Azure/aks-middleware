@@ -3,7 +3,6 @@ package contextlogger
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	log "log/slog"
 	"net/http"
 	"os"
@@ -114,7 +113,6 @@ func BuildAttributes(ctx context.Context, r *http.Request, extractFunc func(ctx 
 	}
 
 	if errMarshalAttrs != nil || errMarshalHeaders != nil {
-		fmt.Println("log attrs: ", logAttrs)
 		attributes = append(attributes, "headers", headers) // Include metadata headers as part of the attributes.
 		attributes = append(attributes, "log", logAttrs)    // grab desired headers from the request (based on extraction function passed to request ID middleware)
 	} else {
