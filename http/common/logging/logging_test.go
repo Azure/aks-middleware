@@ -137,7 +137,7 @@ var _ = Describe("LogRequest", func() {
 	})
 
 	Context("when URL is not a valid resource ID and requires fallback", func() {
-		It("logs the URL with api-version and everything after removed", func() {
+		It("logs the trimmed URL that removes all query parameters", func() {
 			parsedURL, err := url.Parse("https://example.com/api/nonResourcePath?param1=value1&api-version=2023-01-01")
 			Expect(err).To(BeNil())
 

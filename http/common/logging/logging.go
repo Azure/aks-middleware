@@ -1,16 +1,16 @@
 package logging
 
 import (
-    "bytes"
-    "log/slog"
-    "net/http"
-    "net/url"
-    "strings"
-    "time"
+	"bytes"
+	"log/slog"
+	"net/http"
+	"net/url"
+	"strings"
+	"time"
 
-    "github.com/Azure/aks-middleware/http/common"
-    "github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
-    azcorePolicy "github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
+	"github.com/Azure/aks-middleware/http/common"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
+	azcorePolicy "github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 )
 
 type LogRequestParams struct {
@@ -103,7 +103,7 @@ func LogRequest(params LogRequestParams) {
     default:
         return // Unknown request type, do nothing
     }
-
+    fullURL := reqURL
     parsedURL, parseErr := url.Parse(reqURL)
     if parseErr != nil {
         params.Logger.With(
@@ -115,7 +115,7 @@ func LogRequest(params LogRequestParams) {
             "time_ms", "na",
             "method", method,
             "service", service,
-            "url", reqURL,
+            "url", fullURL,
             "error", parseErr.Error(),
         ).Error("error parsing request URL")
     } else {
@@ -138,7 +138,7 @@ func LogRequest(params LogRequestParams) {
         "time_ms", latency,
         "method", methodInfo,
         "service", service,
-        "url", reqURL,
+        "url", fullURL,
         "headers", headers,
     )
 
