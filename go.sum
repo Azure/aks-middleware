@@ -10,8 +10,8 @@ github.com/Azure/retry v0.0.0-20240325164105-70e16f388626 h1:98BT7jV2E/GwrwWKsPr
 github.com/Azure/retry v0.0.0-20240325164105-70e16f388626/go.mod h1:4FpEaBWwrdI8kVPeNESpqzIYAZipu7K6MCGCCC6bJ/A=
 github.com/antlr4-go/antlr/v4 v4.13.0 h1:lxCg3LAv+EUK6t1i0y1V6/SLeUi0eKEKdhQAlS8TVTI=
 github.com/antlr4-go/antlr/v4 v4.13.0/go.mod h1:pfChB/xh/Unjila75QW7+VU4TSnWnnk9UTnmpPaOR2g=
-github.com/bufbuild/protovalidate-go v0.4.3 h1:1Xsm3qhkwioxLDEtxWgtn0Ch71xBP/sBauT/FZnn76A=
-github.com/bufbuild/protovalidate-go v0.4.3/go.mod h1:RcgJ+onKVv4OkAVtzkRUxkocb8stcUAMK0EoqR4fuZE=
+github.com/bufbuild/protovalidate-go v0.2.1 h1:pJr07sYhliyfj/STAM7hU4J3FKpVeLVKvOBmOTN8j+s=
+github.com/bufbuild/protovalidate-go v0.2.1/go.mod h1:e7XXDtlxj5vlEyAgsrxpzayp4cEMKCSSb8ZCkin+MVA=
 github.com/chzyer/logex v1.1.10/go.mod h1:+Ywpsq7O8HXn0nuIou7OrIPyXbp3wmkHB+jjWRnGsAI=
 github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e/go.mod h1:nSuG5e5PlCu98SY8svDHJxuZscDgtXS6KTTbou5AhLI=
 github.com/chzyer/test v0.0.0-20180213035817-a1ea475d72b1/go.mod h1:Q3SI9o4m/ZMnBNeIyt5eFwwo7qiLfzFZmjNmxjkiQlU=
