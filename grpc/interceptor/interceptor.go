@@ -15,9 +15,7 @@ import (
 	log "log/slog"
 	"strings"
 
-	"github.com/bufbuild/protovalidate-go"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
-	protovalidate_middleware "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/protovalidate"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/retry"
 	"google.golang.org/grpc"
@@ -88,7 +86,7 @@ func DefaultClientInterceptors(options ClientInterceptorLogOptions) []grpc.Unary
 }
 
 func DefaultServerInterceptors(options ServerInterceptorLogOptions) []grpc.UnaryServerInterceptor {
-	// The first registerred interceptor will be called first.
+	// The first registered interceptor will be called first.
 	// Need to register requestid first to add request-id.
 	// Then the logger can get the request-id.
 	var apiHandler log.Handler
@@ -132,12 +130,7 @@ func DefaultServerInterceptors(options ServerInterceptorLogOptions) []grpc.Unary
 
 	apiRequestLogger := log.New(apiHandler).With("source", "ApiRequestLog")
 	appCtxlogger := log.New(ctxHandler).With("source", "CtxLog")
-	validator, err := protovalidate.New()
-	if err != nil {
-		panic(err)
-	}
 	return []grpc.UnaryServerInterceptor{
-		protovalidate_middleware.UnaryServerInterceptor(validator),
 		requestid.UnaryServerInterceptor(),
 		ctxlogger.UnaryServerInterceptor(appCtxlogger, nil),
 		logging.UnaryServerInterceptor(
