@@ -9,7 +9,7 @@ import (
 
 	log "log/slog"
 
-	opreq "github.com/Azure/aks-middleware/http/server/operationrequest"
+	"github.com/Azure/aks-middleware/grpc/common"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 )
 
@@ -20,20 +20,8 @@ func InterceptorLogger(logger *log.Logger) logging.Logger {
 		f := make(map[string]any, len(fields)/2)
 		l := logger
 
-		// Extract operation request from context if available
-		if op := opreq.OperationRequestFromContext(ctx); op != nil {
-			// Only add the IDs to the headers field, not as top-level attributes
-			headers := make(map[string]string)
-			if op.CorrelationID != "" {
-				headers["correlation_id"] = op.CorrelationID
-			}
-			if op.OperationID != "" {
-				headers["operation_id"] = op.OperationID
-			}
-			if len(headers) > 0 {
-				l = l.With("headers", headers)
-			}
-		}
+		// add default header fields such as operationId, correlationId, etc
+		l = l.With(common.GetFields(ctx)...)
 
 		// Process the fields from the interceptor
 		i := logging.Fields(fields).Iterator()

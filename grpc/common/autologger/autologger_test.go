@@ -8,10 +8,11 @@ import (
 	log "log/slog"
 
 	"github.com/Azure/aks-middleware/grpc/common/autologger"
-	opreq "github.com/Azure/aks-middleware/http/server/operationrequest"
+	httpcommon "github.com/Azure/aks-middleware/http/common"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"google.golang.org/grpc/metadata"
 )
 
 var _ = Describe("Autologger Tests", func() {
@@ -29,43 +30,39 @@ var _ = Describe("Autologger Tests", func() {
 		ctx = context.Background()
 	})
 
-	It("should log correlation and operation IDs when OperationRequest is in the context", func() {
-		// Create an OperationRequest with correlation and operation IDs
-		opRequest := &opreq.BaseOperationRequest{
-			CorrelationID: "test-correlation-id",
-			OperationID:   "test-operation-id",
-			Extras:        make(map[string]interface{}),
-		}
+	It("should log headers when metadata is present in the context", func() {
+		// Create incoming metadata with correlation and operation IDs
+		md := metadata.Pairs(
+			httpcommon.CorrelationIDKey, "test-correlation-id",
+			httpcommon.OperationIDKey, "test-operation-id",
+		)
 
-		// Add the OperationRequest to the context
-		ctx = opreq.OperationRequestWithContext(ctx, opRequest)
+		ctx = metadata.NewIncomingContext(ctx, md)
 
-		// Setup the logger
 		interceptorLogger := autologger.InterceptorLogger(logger)
-
 		interceptorLogger.Log(ctx, logging.LevelInfo, "test message", "key1", "value1")
 
 		var logEntry map[string]interface{}
 		err := json.Unmarshal(buffer.Bytes(), &logEntry)
 		Expect(err).NotTo(HaveOccurred())
 
-		// Verify the headers field contains both IDs
+		// Verify the headers field contains the metadata
 		Expect(logEntry).To(HaveKey("headers"))
 		headers, ok := logEntry["headers"].(map[string]interface{})
 		Expect(ok).To(BeTrue())
-		Expect(headers).To(HaveKey("correlation_id"))
-		Expect(headers["correlation_id"]).To(Equal("test-correlation-id"))
-		Expect(headers).To(HaveKey("operation_id"))
-		Expect(headers["operation_id"]).To(Equal("test-operation-id"))
+		Expect(headers).To(HaveKey(httpcommon.CorrelationIDKey))
+		Expect(headers[httpcommon.CorrelationIDKey]).To(Equal("test-correlation-id"))
+		Expect(headers).To(HaveKey(httpcommon.OperationIDKey))
+		Expect(headers[httpcommon.OperationIDKey]).To(Equal("test-operation-id"))
 
-		// Verify that correlation_id and operation_id are NOT present as top-level attributes
-		// They should only be in the headers field
-		Expect(logEntry).NotTo(HaveKey("correlation_id"))
-		Expect(logEntry).NotTo(HaveKey("operation_id"))
+		// Verify basic logging fields are present
+		Expect(logEntry).To(HaveKeyWithValue("key1", "value1"))
+		Expect(logEntry).To(HaveKeyWithValue("msg", "test message"))
+		Expect(logEntry).To(HaveKeyWithValue("level", "INFO"))
 
 	})
 
-	It("should handle nonexistent operation request struct correctly", func() {
+	It("should handle context without metadata correctly", func() {
 		interceptorLogger := autologger.InterceptorLogger(logger)
 
 		interceptorLogger.Log(ctx, logging.LevelInfo, "test message", "key1", "value1")
@@ -74,12 +71,15 @@ var _ = Describe("Autologger Tests", func() {
 		err := json.Unmarshal(buffer.Bytes(), &logEntry)
 		Expect(err).NotTo(HaveOccurred())
 
-		// Verify the correlation and operation IDs are not in the log
-		Expect(logEntry).NotTo(HaveKey("correlation_id"))
-		Expect(logEntry).NotTo(HaveKey("operation_id"))
-		Expect(logEntry).NotTo(HaveKey("headers"))
+		// Verify basic logging fields are present
 		Expect(logEntry).To(HaveKeyWithValue("key1", "value1"))
 		Expect(logEntry).To(HaveKeyWithValue("msg", "test message"))
 		Expect(logEntry).To(HaveKeyWithValue("level", "INFO"))
+
+		// Verify headers field is present but empty when no metadata exists
+		Expect(logEntry).To(HaveKey("headers"))
+		headers, ok := logEntry["headers"].(map[string]interface{})
+		Expect(ok).To(BeTrue())
+		Expect(headers).To(BeEmpty())
 	})
 })
