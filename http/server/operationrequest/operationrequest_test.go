@@ -3,6 +3,7 @@ package operationrequest
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -26,7 +27,6 @@ var _ = Describe("OperationRequest Tests", func() {
 	})
 
 	defaultOpts := OperationRequestOptions{
-		Extras:     make(map[string]interface{}),
 		Customizer: noOpCustomizer,
 	}
 
@@ -116,7 +116,6 @@ var _ = Describe("OperationRequest Tests", func() {
 				})
 
 				opts := OperationRequestOptions{
-					Extras:     make(map[string]interface{}),
 					Customizer: customizer,
 				}
 
@@ -147,7 +146,6 @@ var _ = Describe("OperationRequest Tests", func() {
 				})
 
 				opts := OperationRequestOptions{
-					Extras:     make(map[string]interface{}),
 					Customizer: customizer,
 				}
 
@@ -156,6 +154,81 @@ var _ = Describe("OperationRequest Tests", func() {
 				Expect(err).To(Equal(customErr))
 				Expect(op).To(BeNil())
 			})
+		})
+	})
+
+	Describe("Concurrent Access Tests", func() {
+		It("should not have concurrent map writes when processing multiple requests", func() {
+			// Create a customizer that writes to the extras map
+			concurrentCustomizer := OperationRequestCustomizerFunc(func(extras map[string]interface{}, headers http.Header, vars map[string]string) error {
+				// Simulate some processing and write to the extras map
+				extras["test_key"] = "test_value"
+				extras["subscription_id"] = vars[common.SubscriptionIDKey]
+				extras["correlation_id"] = headers.Get(common.RequestCorrelationIDHeader)
+				extras["timestamp"] = "2025-06-18T15:39:23Z"
+				// Add more writes to increase chance of race condition if it exists
+				for i := 0; i < 10; i++ {
+					extras[fmt.Sprintf("key_%d", i)] = fmt.Sprintf("value_%d", i)
+				}
+				return nil
+			})
+
+			opts := OperationRequestOptions{
+				Customizer: concurrentCustomizer,
+			}
+
+			// Create multiple requests
+			numRequests := 100
+			numGoroutines := 10
+			requestsPerGoroutine := numRequests / numGoroutines
+
+			// Channel to collect any panics
+			panicChan := make(chan interface{}, numRequests)
+			doneChan := make(chan bool, numGoroutines)
+
+			// Run concurrent requests
+			for g := 0; g < numGoroutines; g++ {
+				go func(goroutineID int) {
+					defer func() {
+						if r := recover(); r != nil {
+							panicChan <- r
+						}
+						doneChan <- true
+					}()
+
+					for i := 0; i < requestsPerGoroutine; i++ {
+						// Create a new request for each iteration
+						req := httptest.NewRequest("PUT", validURL, bytes.NewBufferString(`{"test": "data"}`))
+						req.Header.Set(common.RequestCorrelationIDHeader, uuid.Must(uuid.NewV4()).String())
+						req.Header.Set(common.RequestAcsOperationIDHeader, uuid.Must(uuid.NewV4()).String())
+						req.Header.Set(common.RequestAcceptLanguageHeader, "en-US")
+
+						routeMatch := &mux.RouteMatch{}
+						Expect(router.Match(req, routeMatch)).To(BeTrue())
+						req = mux.SetURLVars(req, routeMatch.Vars)
+
+						// This should not panic with concurrent map writes
+						op, err := NewBaseOperationRequest(req, "region-test", opts)
+						Expect(err).ToNot(HaveOccurred())
+						Expect(op).ToNot(BeNil())
+						Expect(op.Extras).ToNot(BeNil())
+						Expect(op.Extras["test_key"]).To(Equal("test_value"))
+					}
+				}(g)
+			}
+
+			// Wait for all goroutines to complete
+			for i := 0; i < numGoroutines; i++ {
+				<-doneChan
+			}
+
+			// Check if any panics occurred
+			select {
+			case panic := <-panicChan:
+				Fail(fmt.Sprintf("Concurrent map write panic occurred: %v", panic))
+			default:
+				// No panics - test passed
+			}
 		})
 	})
 })
