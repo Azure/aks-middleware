@@ -253,22 +253,18 @@ import (
     "github.com/gorilla/mux"
 )
 
-type MyExtras struct {
-    MyCustomHeader string
-}
-
-func myCustomizer(extras *MyExtras, headers http.Header, vars map[string]string) error {
+customizer := OperationRequestCustomizerFunc(func(extras map[string]interface{}, headers http.Header, vars map[string]string) error {
     if customHeader := headers.Get("X-My-Custom-Header"); customHeader != "" {
-        extras.MyCustomHeader = customHeader
+        extras["MyCustomHeader"] = customHeader
     }
     return nil
-}
+})
+
 
 func main() {
     router := mux.NewRouter()
-    opts := operationrequest.OperationRequestOptions[MyExtras]{
-        Extras:     MyExtras{},
-        Customizer: myCustomizer,
+    opts := operationrequest.OperationRequestOptions{
+        Customizer: customizer,
     }
     router.Use(operationrequest.NewOperationRequest("region-name", opts))
     // Add your routes here

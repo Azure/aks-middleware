@@ -40,7 +40,6 @@ type BaseOperationRequest struct {
 type OperationRequestCustomizerFunc func(extras map[string]interface{}, headers http.Header, vars map[string]string) error
 
 type OperationRequestOptions struct {
-    Extras     map[string]interface{}
     Customizer OperationRequestCustomizerFunc
 }
 
@@ -53,9 +52,12 @@ type OperationRequestOptions struct {
 //  5. Route Name: Optionally capture the route name from mux.CurrentRoute.
 //  6. Customization: Allow further customization of extras.
 func NewBaseOperationRequest(req *http.Request, region string, opts OperationRequestOptions) (*BaseOperationRequest, error) {
+    // Create a fresh extras map for this request
+    extras := make(map[string]interface{})
+
     op := &BaseOperationRequest{
         Request: req,
-        Extras:  opts.Extras,
+        Extras:  extras,
     }
 
     query := req.URL.Query()

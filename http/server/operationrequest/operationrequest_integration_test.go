@@ -1,16 +1,16 @@
 package operationrequest
 
 import (
-	"encoding/json"
-	"io"
-	"net/http"
-	"net/http/httptest"
-	"strings"
+    "encoding/json"
+    "io"
+    "net/http"
+    "net/http/httptest"
+    "strings"
 
-	"github.com/Azure/aks-middleware/http/common"
-	"github.com/gorilla/mux"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+    "github.com/Azure/aks-middleware/http/common"
+    "github.com/gorilla/mux"
+    . "github.com/onsi/ginkgo/v2"
+    . "github.com/onsi/gomega"
 )
 
 var _ = Describe("OperationRequest Context Examination Integration", func() {
@@ -29,7 +29,6 @@ var _ = Describe("OperationRequest Context Examination Integration", func() {
     })
 
     defaultOpts := OperationRequestOptions{
-        Extras:     make(map[string]interface{}),
         Customizer: extrasCustomizer,
     }
 

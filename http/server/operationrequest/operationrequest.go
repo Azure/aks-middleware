@@ -1,13 +1,13 @@
 package operationrequest
 
 import (
-    "context"
-    "fmt"
-    "net/http"
-    "time"
+	"context"
+	"fmt"
+	"net/http"
+	"time"
 
-    "github.com/Azure/aks-middleware/http/common"
-    "github.com/gorilla/mux"
+	"github.com/Azure/aks-middleware/http/common"
+	"github.com/gorilla/mux"
 )
 
 const ARMTimeout = 60 * time.Second
@@ -15,7 +15,7 @@ const ARMTimeout = 60 * time.Second
 var _ http.Handler = &operationRequestMiddleware{}
 
 // NewOperationRequest creates an operationRequestMiddleware using the provided options.
-// The options contains both the Extras value and its customizer.
+// The options contains the customizer.
 func NewOperationRequest(region string, opts OperationRequestOptions) mux.MiddlewareFunc {
     return func(next http.Handler) http.Handler {
         return &operationRequestMiddleware{
