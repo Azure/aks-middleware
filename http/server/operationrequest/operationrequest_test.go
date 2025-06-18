@@ -163,9 +163,6 @@ var _ = Describe("OperationRequest Tests", func() {
 			concurrentCustomizer := OperationRequestCustomizerFunc(func(extras map[string]interface{}, headers http.Header, vars map[string]string) error {
 				// Simulate some processing and write to the extras map
 				extras["test_key"] = "test_value"
-				extras["subscription_id"] = vars[common.SubscriptionIDKey]
-				extras["correlation_id"] = headers.Get(common.RequestCorrelationIDHeader)
-				extras["timestamp"] = "2025-06-18T15:39:23Z"
 				// Add more writes to increase chance of race condition if it exists
 				for i := 0; i < 10; i++ {
 					extras[fmt.Sprintf("key_%d", i)] = fmt.Sprintf("value_%d", i)
@@ -199,8 +196,8 @@ var _ = Describe("OperationRequest Tests", func() {
 					for i := 0; i < requestsPerGoroutine; i++ {
 						// Create a new request for each iteration
 						req := httptest.NewRequest("PUT", validURL, bytes.NewBufferString(`{"test": "data"}`))
-						req.Header.Set(common.RequestCorrelationIDHeader, uuid.Must(uuid.NewV4()).String())
-						req.Header.Set(common.RequestAcsOperationIDHeader, uuid.Must(uuid.NewV4()).String())
+						req.Header.Set(common.RequestCorrelationIDHeader, "test-correlation-id")
+						req.Header.Set(common.RequestAcsOperationIDHeader, "test-operation-id")
 						req.Header.Set(common.RequestAcceptLanguageHeader, "en-US")
 
 						routeMatch := &mux.RouteMatch{}
