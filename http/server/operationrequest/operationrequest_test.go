@@ -196,8 +196,8 @@ var _ = Describe("OperationRequest Tests", func() {
 					for i := 0; i < requestsPerGoroutine; i++ {
 						// Create a new request for each iteration
 						req := httptest.NewRequest("PUT", validURL, bytes.NewBufferString(`{"test": "data"}`))
-						req.Header.Set(common.RequestCorrelationIDHeader, "test-correlation-id")
-						req.Header.Set(common.RequestAcsOperationIDHeader, "test-operation-id")
+						req.Header.Set(common.RequestCorrelationIDHeader, uuid.Must(uuid.NewV4()).String())
+						req.Header.Set(common.RequestAcsOperationIDHeader, uuid.Must(uuid.NewV4()).String())
 						req.Header.Set(common.RequestAcceptLanguageHeader, "en-US")
 
 						routeMatch := &mux.RouteMatch{}
