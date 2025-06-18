@@ -49,7 +49,6 @@ var _ = Describe("OperationRequest and ContextLogger Integration", func() {
 		})
 
 		defaultOpts := opreq.OperationRequestOptions{
-			Extras:     make(map[string]interface{}),
 			Customizer: extrasCustomizer,
 		}
 
