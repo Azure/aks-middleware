@@ -11,10 +11,10 @@ var _ = Describe("Filtered logging test", func() {
 	Context("when name/address is set as loggable=true", func() {
 		It("should only print name, address, and address leaf nodes", func() {
 			addr := &pb.Address{
-				Street:  "123 Main St",
-				City:    "Seattle",
-				State:   "WA",
-				Zipcode: int32(98101),
+				StreetName: "123 Main St",
+				City:       "Seattle",
+				State:      "WA",
+				Zipcode:    int32(98101),
 			}
 			logs := ctxlogger.FilterLogs(&pb.HelloRequest{Name: "TestName", Age: 53, Email: "test@test.com", Address: addr})
 

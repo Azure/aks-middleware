@@ -48,6 +48,6 @@ message Address {
     gte: 10000,
     lt: 99999
   }]; // The zip code
-  string street = 4 [(buf.validate.field).string.min_len = 1, (servicehub.fieldoptions.loggable) = false]; // The street name
+  string street_name = 4 [(buf.validate.field).string.min_len = 1, (servicehub.fieldoptions.loggable) = false]; // The street name
   
 }
