@@ -79,43 +79,42 @@ func defaultExtractFunction(ctx context.Context, req any, info *grpc.UnaryServer
 }
 
 func filterLoggableFields(currentMap map[string]interface{}, message protoreflect.Message) map[string]interface{} {
-	// Check if the map or the message is nil
 	if currentMap == nil || message == nil {
 		return currentMap
 	}
-	for name, value := range currentMap {
-		// Find the field descriptor by JSON name
-		var fd protoreflect.FieldDescriptor
-		fields := message.Descriptor().Fields()
-		for i := 0; i < fields.Len(); i++ {
-			field := fields.Get(i)
-			if field.JSONName() == name {
-				fd = field
-				break
-			}
-		}
-		// Check if the field descriptor was found
-		if fd == nil {
-			continue
-		}
-		opts := fd.Options()
-		fdOpts := opts.(*descriptorpb.FieldOptions)
-		loggable := proto.GetExtension(fdOpts, loggable.E_Loggable)
 
-		// Delete the field from the map if it is not loggable
-		if !loggable.(bool) {
-			delete(currentMap, name)
+	// Iterate through all fields in the JSON map (keys are JSON field names like "attestedData")
+	for name, value := range currentMap {
+		// Find the protobuf field descriptor using the JSON field name
+		// This handles the mapping between JSON names ("attestedData") and proto names ("attested_data")
+		fd := message.Descriptor().Fields().ByJSONName(name)
+		if fd == nil {
+			// Field not found in protobuf descriptor - skip this field (keep it in the map)
 			continue
 		}
-		// Check if the value is another map[string]interface{}
-		if subMap, ok := value.(map[string]interface{}); ok {
-			// Check if its a simple map or one containing messages
-			if fd.Message() != nil && !fd.Message().IsMapEntry() {
-				// Get the sub-message for the field
-				subMessage := message.Get(fd).Message()
-				// Call the helper function recursively on the subMap and subMessage
-				currentMap[name] = filterLoggableFields(subMap, subMessage)
+
+		// Get the field options from the protobuf descriptor
+		opts, ok := fd.Options().(*descriptorpb.FieldOptions)
+		if !ok {
+			// No field options available - skip this field (keep it in the map)
+			continue
+		}
+
+		// Check for the loggable extension: [(servicehub.fieldoptions.loggable) = false]
+		if loggableExt := proto.GetExtension(opts, loggable.E_Loggable); loggableExt != nil {
+			// Extension exists, check if it's a boolean and if logging is disabled
+			if allowed, ok := loggableExt.(bool); ok && !allowed {
+				// Field is marked as not loggable - remove it from the map
+				delete(currentMap, name)
+				continue
 			}
+		}
+
+		// Handle nested messages recursively
+		if subMap, ok := value.(map[string]interface{}); ok && fd.Message() != nil && !fd.Message().IsMapEntry() {
+			// This field contains a nested message, recursively filter its fields
+			subMessage := message.Get(fd).Message()
+			currentMap[name] = filterLoggableFields(subMap, subMessage)
 		}
 	}
 	return currentMap
