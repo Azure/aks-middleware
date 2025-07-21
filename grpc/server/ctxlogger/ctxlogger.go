@@ -84,9 +84,17 @@ func filterLoggableFields(currentMap map[string]interface{}, message protoreflec
 		return currentMap
 	}
 	for name, value := range currentMap {
-		// Get the field descriptor by name
-		fd := message.Descriptor().Fields().ByName(protoreflect.Name(name))
-		// Check if the field descriptor is nil
+		// Find the field descriptor by JSON name
+		var fd protoreflect.FieldDescriptor
+		fields := message.Descriptor().Fields()
+		for i := 0; i < fields.Len(); i++ {
+			field := fields.Get(i)
+			if field.JSONName() == name {
+				fd = field
+				break
+			}
+		}
+		// Check if the field descriptor was found
 		if fd == nil {
 			continue
 		}
