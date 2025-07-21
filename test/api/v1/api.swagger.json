@@ -68,7 +68,7 @@
           "format": "int32",
           "title": "The zip code"
         },
-        "street": {
+        "streetName": {
           "type": "string",
           "title": "The street name"
         }
