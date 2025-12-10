@@ -36,7 +36,6 @@ func SendOtelAuditEvent(logger *slog.Logger, otelConfig *OtelConfig, ctx context
 	}
 
 	if shouldExclude(req, otelConfig.ExcludeAuditEvents) {
-		logger.Info(fmt.Sprintf("Exluding audit event. method: %s url: %s", req.Method, req.URL.String()))
 		return
 	}
 

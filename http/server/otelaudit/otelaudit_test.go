@@ -218,7 +218,7 @@ var _ = Describe("Otel Audit Test", func() {
 			localRouter.ServeHTTP(w, req)
 
 			Expect(w.Result().StatusCode).To(Equal(http.StatusOK))
-			Expect(buf.String()).To(ContainSubstring("Exluding audit event"))
+			Expect(buf.String()).To(BeEmpty())
 
 			buf.Reset()
 			w = httptest.NewRecorder()
