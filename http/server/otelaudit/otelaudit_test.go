@@ -74,6 +74,27 @@ var _ = Describe("createOtelAuditEvent", func() {
 		Expect(auditEvent.Record.CallerAgent).To(Equal("TestAgent"))
 		Expect(auditEvent.Record.OperationCategories).To(ConsistOf(msgs.OCOther))
 	})
+
+	DescribeTable("should provide a valid caller agent",
+		func(setHeader bool, userAgent, expected string) {
+			reqURL := "https://management.azure.com/subscriptions/sub-123/resourceGroups/rg-name/providers/Microsoft.Storage/storageAccounts/account-name?api-version=version"
+			req := httptest.NewRequest("GET", reqURL, nil)
+			req.RemoteAddr = "127.0.0.1:8080"
+			if setHeader {
+				req.Header.Set("User-Agent", userAgent)
+			}
+
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, req)
+
+			Expect(auditErr).To(BeNil())
+			Expect(auditEvent.Record.CallerAgent).To(Equal(expected))
+		},
+		Entry("when User-Agent is missing", false, "", "Unknown"),
+		Entry("when User-Agent is explicitly empty", true, "", "Unknown"),
+		Entry("when User-Agent contains only whitespace", true, "   ", "Unknown"),
+		Entry("when User-Agent is present", true, "TestAgent", "TestAgent"),
+	)
 })
 
 var _ = Describe("Otel Audit Test", func() {

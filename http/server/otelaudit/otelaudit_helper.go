@@ -93,6 +93,10 @@ func createOtelAuditEvent(logger *slog.Logger, statusCode int, req *http.Request
 	}
 	reqURL := logging.TrimURL(*parsedURL)
 	methodInfo := logging.GetMethodInfo(req.Method, reqURL)
+	callerAgent := strings.TrimSpace(req.UserAgent())
+	if callerAgent == "" {
+		callerAgent = "Unknown"
+	}
 	record := msgs.Record{
 		CallerIpAddress:              addr,
 		CallerIdentities:             getCallerIdentities(req),
@@ -102,7 +106,7 @@ func createOtelAuditEvent(logger *slog.Logger, statusCode int, req *http.Request
 		CallerAccessLevels:           []string{"NA"},
 		OperationAccessLevel:         otelConfig.OperationAccessLevel,
 		OperationName:                methodInfo,
-		CallerAgent:                  req.UserAgent(),
+		CallerAgent:                  callerAgent,
 		OperationType:                getOperationType(req.Method),
 		OperationResult:              getOperationResult(statusCode),
 		OperationResultDescription:   getOperationResultDescription(statusCode, errorMsg),
